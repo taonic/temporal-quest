@@ -32,7 +32,7 @@ Agreed in a grilling session on 2026-11-11.
 
 - **New event** asks for:
   - a name (*Phuket Derby*)
-  - a duration (default **75 min**: Essentials' estimate is 53, plus the challenges and slack for venue Wi-Fi)
+  - a duration (default **25 min**)
   - a join code (generated and editable)
   - whether sound is on by default
 - **Join code**: one word plus 2 digits (`DERBY42`), case-insensitive, with no 0/O or 1/I.

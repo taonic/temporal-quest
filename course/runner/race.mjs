@@ -48,7 +48,7 @@ const PRESENT_MS = 3 * 60_000;
 // Ghosts graze sooner: a rehearsal shouldn't wait to see it.
 export const GHOST_GRAZE_MS = 60_000;
 export { QUESTION_XP, QUIZ_SHARE, quizXp } from "../web/src/race/rules.js";
-export const DEFAULT_DURATION = 75;
+export const DEFAULT_DURATION = 25;
 export const MAX_RACERS = SILKS.length;
 export const GHOST_FIELD = 15;
 // Access ends this long after the clock runs out.

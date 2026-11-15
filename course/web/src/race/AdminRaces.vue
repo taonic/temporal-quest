@@ -18,7 +18,7 @@ const now = ref(Date.now());
 const error = ref("");
 const busy = ref(false);
 
-const draft = ref({ name: "", durationMinutes: 75, joinCode: "", sound: true });
+const draft = ref({ name: "", durationMinutes: 25, joinCode: "", sound: true });
 const editing = ref(false);
 const settings = ref({});
 
@@ -70,7 +70,7 @@ async function create() {
   busy.value = true;
   try {
     const made = await api("/api/admin/races", { method: "POST", body: draft.value });
-    draft.value = { name: "", durationMinutes: 75, joinCode: "", sound: true };
+    draft.value = { name: "", durationMinutes: 25, joinCode: "", sound: true };
     await loadList();
     selectedId.value = made.id;
     toast(`${made.name} is ready: share its code, ${made.joinCode}`);
