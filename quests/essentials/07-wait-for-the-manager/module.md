@@ -19,13 +19,13 @@ check:
   quiz:
     question: You approved the trip while no coordinator was on shift. What happened to your answer?
     choices:
-      - label: Temporal wrote it into the trip's logbook, and the next coordinator acted on it.
+      - label: It was lost when nobody picked it up, so you had to approve the trip again.
+        explanation: You only approved once. Look at the trip's logbook in the Temporal UI, and your answer is there, from before anyone was back on shift.
+      - label: Temporal took the answer and booked the trip by itself, without a coordinator.
+        explanation: Temporal keeps the logbook. The coordinators do the steps. Nothing was booked until one was back on shift.
+      - label: It was written into the trip's logbook, and the next coordinator on shift acted on it.
         right: true
         explanation: The answer went to the trip, not to a coordinator, so it was kept the moment you gave it. Whoever came on shift next found it in the logbook.
-      - label: It was lost, and you had to approve the trip again.
-        explanation: You only approved once. Look at the trip's logbook in the Temporal UI, and your answer is there, from before anyone was back on shift.
-      - label: Temporal booked the trip by itself, without a coordinator.
-        explanation: Temporal keeps the logbook. The coordinators do the steps. Nothing was booked until one was back on shift.
 questions:
   - What kinds of approvals could a trip wait for?
   - What if the manager takes a week to answer?

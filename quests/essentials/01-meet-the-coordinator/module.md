@@ -17,12 +17,12 @@ check:
   quiz:
     question: Halfway through a trip, the coordinator goes home sick. How does the next one on shift know where the trip was?
     choices:
-      - label: They read the logbook, which the office keeps in the safe.
-        right: true
-        explanation: Every step that's done is written down there, so the next coordinator carries on from the first step that isn't. That's what Temporal keeps for every trip.
       - label: They ask the customer how far it got.
         explanation: The customer can't know what was booked behind the scenes, and nobody should have to ask them. The logbook already says.
-      - label: They start the trip again from the top, to be safe.
+      - label: They read the logbook, which the office keeps in its safe.
+        right: true
+        explanation: Every step that's done is written down there, so the next coordinator carries on from the first step that isn't. That's what Temporal keeps for every trip.
+      - label: They start the trip again from the top, so nothing is missed.
         explanation: Starting over books the flight and the hotel a second time. The logbook is there so nobody has to.
 questions:
   - In plain words, what is a workflow?

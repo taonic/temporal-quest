@@ -371,6 +371,31 @@ test("each persona sees its own branches, paths and badges, and what it sees bui
   assert.ok(course.exercises.filter((e) => e.id !== "07-essentials").every((e) => e.layout === "code"));
 });
 
+test("Essentials' answers give nothing away: the right one isn't always first, nor always the longest", () => {
+  const course = buildCourse();
+  const essentials = course.exercises.find((e) => e.id === "07-essentials");
+  const text = (html) => html.replace(/<[^>]+>/g, "").replace(/&[a-z0-9#]+;/g, "x");
+  const questions = [
+    ...Object.entries(essentials.checks).map(([id, check]) => [id, check.quiz.choices, true]),
+    ...Object.entries(essentials.challenges).map(([id, challenge]) => [id, challenge.choices, true]),
+    // The boss shuffles its choices each fight (boss.js), so only their lengths matter.
+    ...course.modules.find((m) => m.id === "E-boss").pool.map((q) => [q.id, q.choices, false]),
+  ];
+  const at = (choices) => choices.findIndex((c) => c.right);
+  const longest = (choices) => {
+    const lengths = choices.map((c) => text(c.label).length);
+    return lengths[at(choices)] === Math.max(...lengths);
+  };
+  // Shown in the order written: no one place holds the right answer in more than half of them.
+  const ordered = questions.filter(([, , fixed]) => fixed);
+  for (const place of [0, 1, 2, 3]) {
+    const there = ordered.filter(([, choices]) => at(choices) === place).map(([id]) => id);
+    assert.ok(there.length <= ordered.length / 2, `the right answer is choice ${"ABCD"[place]} in ${there.join(", ")}: mix the order`);
+  }
+  const tells = questions.filter(([, choices]) => longest(choices)).map(([id]) => id);
+  assert.ok(tells.length <= questions.length / 2, `the right answer is the longest in ${tells.join(", ")}: even out the lengths`);
+});
+
 test("in the browser, a #board link is the board's action button; anything else isn't an action", async () => {
   const essentials = buildCourse().exercises.find((e) => e.id === "07-essentials");
   const html = essentials.modes.browser.sections.map((s) => s.html).join("\n");

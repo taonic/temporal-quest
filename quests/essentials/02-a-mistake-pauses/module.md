@@ -20,13 +20,13 @@ check:
   quiz:
     question: After the fix shipped, why wasn't the Temporal trip's flight booked a second time?
     choices:
-      - label: The trip carried on from the hotel step, because its logbook says the flight is already booked.
+      - label: The airline noticed the second booking for the same trip and refused it.
+        explanation: The outside world doesn't protect you like that. In the next modules, you'll see the plain twin book things twice, and nobody stops it.
+      - label: The fix cancelled the first flight, then booked a fresh one in its place.
+        explanation: Nothing was cancelled. Look at the outside world, where there's one flight for that trip, booked before the mistake.
+      - label: Its logbook says the flight is booked, so it carried on from the hotel step.
         right: true
         explanation: The fix didn't start a new trip. The same trip picked up where it had paused, and the steps already in its logbook stayed done.
-      - label: The airline noticed the second booking and refused it.
-        explanation: The outside world doesn't protect you like that. In the next modules, you'll see the plain twin book things twice, and nobody stops it.
-      - label: The fix cancelled the first flight and booked a new one.
-        explanation: Nothing was cancelled. Look at the outside world, where there's one flight for that trip, booked before the mistake.
 questions:
   - Why doesn't the Temporal trip book the flight again after the fix?
   - What happens to customers stuck on a mistake without Temporal?

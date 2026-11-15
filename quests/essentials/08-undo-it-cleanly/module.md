@@ -21,12 +21,12 @@ check:
   quiz:
     question: The card was declined. Why didn't the trip keep trying it, the way it kept trying the airline?
     choices:
-      - label: A declined card is an answer, not a blip. Asking again won't change it, so the trip undoes what it booked instead.
-        right: true
-        explanation: Retrying is for failures that pass, like the airline's bad minute. A no from the bank is final, so the trip's job becomes leaving nothing half-done.
       - label: Temporal only retries the airline.
         explanation: Temporal retries any step that fails. It tried the hotel again and again while the hotel step had a mistake in it. This failure says "don't bother", so it doesn't.
-      - label: It had used up its attempts.
+      - label: A decline is an answer, not a blip. Asking again won't change it.
+        right: true
+        explanation: Retrying is for failures that pass, like the airline's bad minute. A no from the bank is final, so the trip's job becomes leaving nothing half-done.
+      - label: It had already used up every attempt it was allowed for the card step.
         explanation: The trip's steps have no limit on attempts. It stopped because the card network's answer was a definite no, not because it ran out.
 questions:
   - Why cancel the hotel before the flight?

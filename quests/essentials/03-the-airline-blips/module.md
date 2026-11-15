@@ -19,10 +19,10 @@ check:
   quiz:
     question: The airline was down for 20 seconds. Why did the Temporal trip get through when the plain program didn't?
     choices:
-      - label: It kept trying, waiting a little longer each time, until the airline answered.
+      - label: It kept trying, waiting a little longer each time.
         right: true
         explanation: Its retry policy has no limit on attempts, so it outlasted the bad minute. The plain program gave up after three quick tries.
-      - label: Temporal has a better connection to the airline.
+      - label: Temporal has its own, more reliable connection to the airline's systems.
         explanation: Both trips called the same airline and got the same failures. The difference is what each did next.
       - label: It skipped the flight and came back for it later.
         explanation: The steps go in order. It stayed on "Find a flight" and tried again, and nothing after it started until it got through.

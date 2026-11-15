@@ -20,13 +20,13 @@ check:
   quiz:
     question: While nobody was on shift, where was the Temporal trip?
     choices:
-      - label: In Temporal, written down and waiting for a coordinator to pick it up.
+      - label: Nowhere. Temporal started a new trip later.
+        explanation: It's the same trip, with the same logbook. Open it in the Temporal UI, and you'll see it was started before anyone was on shift.
+      - label: In the last coordinator's memory, kept there until they came back on shift.
+        explanation: There was no coordinator. That's the point. The trip waited in Temporal, where it doesn't depend on any of them.
+      - label: In Temporal, written down and waiting for a coordinator.
         right: true
         explanation: Asking for a trip writes it into Temporal straight away. It doesn't need anyone on shift to be safe, only to make progress.
-      - label: Nowhere. Temporal started a new trip when the coordinator arrived.
-        explanation: It's the same trip, with the same logbook. Open it in the Temporal UI, and you'll see it was started before anyone was on shift.
-      - label: In the coordinator's memory, until they came back.
-        explanation: There was no coordinator. That's the point. The trip waited in Temporal, where it doesn't depend on any of them.
 questions:
   - When would nobody be on shift in real life?
   - How long can a trip wait for a worker?

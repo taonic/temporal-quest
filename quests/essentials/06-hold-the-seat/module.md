@@ -19,12 +19,12 @@ check:
   quiz:
     question: The plug was pulled during the three days. How did the trip know when the wait was over?
     choices:
-      - label: Temporal kept the time, and handed the trip to the next coordinator once the wait was done.
+      - label: Temporal kept the time, and woke the trip when the wait was done.
         right: true
         explanation: The wait belongs to the trip, and Temporal keeps the clock. Nobody has to be on shift for the time to pass.
-      - label: The coordinator kept counting while they were away.
+      - label: The coordinator kept counting the days at home while the office was down.
         explanation: There was no coordinator. The plug was pulled. Nothing of the coordinator's survived, and nothing needed to.
-      - label: It didn't. It started the three days again when the coordinator came back.
+      - label: It didn't. It started the three days over when the coordinator came back.
         explanation: Watch the countdown when you pull the plug. It keeps going, and the trip carries on as soon as it ends, not three days after.
 questions:
   - What kinds of waits do real businesses have?

@@ -19,11 +19,11 @@ check:
   quiz:
     question: After the plug was pulled, why didn't the Temporal trip book the hotel a second time?
     choices:
-      - label: The next coordinator read the logbook, saw the hotel was booked, and carried on from the card.
+      - label: The hotel spotted the second booking for the same guest and refused it.
+        explanation: Look at the outside world. The plain twin's second hotel booking went straight through. Nothing out there protects you.
+      - label: The next coordinator read the logbook and carried on from the card.
         right: true
         explanation: The logbook survived the crash because it was never with the coordinator. It was in Temporal. So the next one knew exactly where to pick up.
-      - label: The hotel spotted the double booking and refused it.
-        explanation: Look at the outside world. The plain twin's second hotel booking went straight through. Nothing out there protects you.
       - label: Temporal cancelled the first booking and made it again.
         explanation: Nothing was cancelled or made again. There's one hotel booking for the Temporal trip, from before the plug was pulled.
 questions:
