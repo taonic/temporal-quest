@@ -403,35 +403,44 @@ export function forgetProgress() {
   progress.badges = {};
 }
 
-// What Continue opens: on a path, its first module not done; otherwise the first playable module
-// not done whose prerequisites are, in map order (and failing that, the first not done).
+// The boss at the end of a module's branch, when it's playable (and isn't the module itself).
+function bossAfter(id) {
+  const m = modulesById.get(id);
+  const branch = m && branchesById.get(m.branch);
+  const boss = branch?.boss && id !== branch.boss ? modulesById.get(branch.boss) : null;
+  return boss && isPlayable(boss) ? boss : null;
+}
+
+// What Continue opens: on a path, its first module not done, then its branch's boss; otherwise
+// the first playable module not done whose prerequisites are, in map order (and failing that,
+// the first not done).
 export const recommended = computed(() => {
   const playable = (id) => modulesById.get(id) && isPlayable(modulesById.get(id));
   if (activePath.value) {
     const id = activePath.value.modules.find((m) => playable(m) && !isDone(m));
-    return id ? modulesById.get(id) : null;
+    if (id) return modulesById.get(id);
+    const boss = bossAfter(activePath.value.modules.at(-1));
+    return boss && !isDone(boss.id) ? boss : null;
   }
   const open = mapOrder.map((id) => modulesById.get(id)).filter((m) => isPlayable(m) && !isDone(m.id));
   return open.find(isUnlocked) ?? open[0] ?? null;
 });
 
 // The module after this one: the path's next, when it's on the active path; otherwise the next
-// playable one in its branch. null at the end.
+// playable one in its branch. The last step (of the path, or the branch) leads to the branch's
+// boss, once it's playable. null at the end.
 export function nextModule(id) {
   const path = activePath.value?.modules ?? [];
   const at = path.indexOf(id);
   if (at >= 0) {
     const next = path.slice(at + 1).find((m) => isPlayable(modulesById.get(m)));
-    return next ? modulesById.get(next) : null;
+    return next ? modulesById.get(next) : bossAfter(path.at(-1));
   }
   const m = modulesById.get(id);
   if (!m) return null;
   const branch = branchesById.get(m.branch);
   const next = branch.modules.slice(branch.modules.indexOf(id) + 1).find((other) => isPlayable(modulesById.get(other)));
-  if (next) return modulesById.get(next);
-  // The branch's last step leads to its boss, once it's playable.
-  const boss = branch.boss && id !== branch.boss ? modulesById.get(branch.boss) : null;
-  return boss && isPlayable(boss) ? boss : null;
+  return next ? modulesById.get(next) : bossAfter(id);
 }
 
 // Where a module sits in its branch: { index (1-based), total } over the playable ones.
