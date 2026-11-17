@@ -1,0 +1,275 @@
+# The Derby load test: a full field of racers on the live site, each a real browser with a real
+# sandbox, through a whole race. By hand only: Actions → Derby load test → Run workflow.
+# The plan, and what it checks: .scratch/derby-load-test/spec.md. The racers:
+# course/e2e/load/derby-load.spec.mjs.
+#
+#   setup ──┬── racers (a shard of racers a runner) ──┬── report
+#           └── conductor (the host, and the screen) ─┘   cleanup (always)
+#
+# Needs the e2e tests' secrets: E2E_SIGNIN_KEY and E2E_ADMIN_EMAIL (the race's host). The repo is
+# public, and so are a run's logs and artifacts: the join code is masked, and only timings,
+# standings and the report are uploaded (no traces: they carry session cookies).
+name: Derby load test
+
+on:
+  workflow_dispatch:
+    inputs:
+      racers:
+        description: Racers (20 is a full field)
+        default: "20"
+      shards:
+        description: Runners to spread them over
+        default: "4"
+      pace:
+        description: rush (no thinking) or paced (5–20 s a beat, like people reading)
+        type: choice
+        options: [paced, rush]
+        default: paced
+      minutes:
+        description: The race's length
+        default: "25"
+      seed:
+        description: Which wrong answers each racer picks
+        default: "1"
+      latency_ms:
+        description: Added to each racer's requests (~200 for a room in Asia)
+        default: "0"
+
+permissions:
+  contents: read
+  actions: read # to see whether an E2E run is going
+
+# The deploy's group: a merge to main during a run waits for it, instead of restarting the
+# machine under the racers. (A deploy by hand, npm run deploy, doesn't wait.)
+concurrency:
+  group: fly-deploy
+  cancel-in-progress: false
+
+env:
+  E2E_SIGNIN_KEY: ${{ secrets.E2E_SIGNIN_KEY }}
+  E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL || vars.E2E_ADMIN_EMAIL }}
+  FLY_APP: temporal-quest
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      race-id: ${{ steps.race.outputs.race-id }}
+      shards: ${{ steps.shards.outputs.shards }}
+      per-shard: ${{ steps.shards.outputs.per-shard }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Not during an E2E run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          busy=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow e2e.yml --json status --jq '[.[] | select(.status == "in_progress" or .status == "queued")] | length')
+          if [ "$busy" != "0" ]; then echo "::error::An E2E run is going: run this after it."; exit 1; fi
+
+      - name: The shards
+        id: shards
+        env:
+          RACERS: ${{ inputs.racers }}
+          SHARDS: ${{ inputs.shards }}
+        run: |
+          per=$(( (RACERS + SHARDS - 1) / SHARDS ))
+          shards=$(( (RACERS + per - 1) / per ))
+          echo "per-shard=$per" >> "$GITHUB_OUTPUT"
+          echo "shards=$(jq -cn --argjson n "$shards" '[range($n)]')" >> "$GITHUB_OUTPUT"
+          echo "$RACERS racers: $shards runners of $per" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            course/package-lock.json
+            course/e2e/package-lock.json
+
+      # The course as built from this commit: the racers answer from it.
+      - name: Build the course data
+        working-directory: course
+        run: npm ci && npm run content
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: course-data
+          path: course/web/src/generated/course-data.json
+          retention-days: 1
+
+      - name: Make the race
+        id: race
+        working-directory: course/e2e
+        env:
+          MINUTES: ${{ inputs.minutes }}
+        run: |
+          npm ci
+          node load/host.mjs setup --name "Load test" --minutes "$MINUTES"
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: The machine, before
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: flyctl machine list --app "$FLY_APP" || true
+
+  racers:
+    needs: setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.setup.outputs.shards) }}
+    defaults:
+      run:
+        working-directory: course/e2e
+    env:
+      RACE: ${{ needs.setup.outputs.race-id }}
+      DERBY_RACERS: ${{ inputs.racers }}
+      DERBY_PER_SHARD: ${{ needs.setup.outputs.per-shard }}
+      DERBY_SHARD: ${{ matrix.shard }}
+      DERBY_PACE: ${{ inputs.pace }}
+      DERBY_SEED: ${{ inputs.seed }}
+      DERBY_LATENCY_MS: ${{ inputs.latency_ms }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: course/e2e/package-lock.json
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: course-data
+          path: course/web/src/generated
+
+      - run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: The join code, masked
+        run: |
+          code=$(node load/host.mjs code --race "$RACE")
+          echo "::add-mask::$code"
+          echo "DERBY_CODE=$code" >> "$GITHUB_ENV"
+
+      - name: Race
+        run: |
+          mkdir -p reports/load
+          # The runner's own load, every 10 s: a busy runner slows its racers, not the site.
+          (while true; do echo "$(date +%s) $(cut -d' ' -f1-3 /proc/loadavg)" >> "reports/load/cpu-shard-$DERBY_SHARD.log"; sleep 10; done) &
+          npx playwright test -c load.config.mjs
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: load-shard-${{ matrix.shard }}
+          path: |
+            course/e2e/reports/load/*.json
+            course/e2e/reports/load/*.jsonl
+            course/e2e/reports/load/*.log
+          retention-days: 14
+          if-no-files-found: ignore
+
+  conductor:
+    needs: setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: course/e2e
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: course/e2e/package-lock.json
+
+      - run: npm ci
+
+      - name: Host the race
+        env:
+          RACE: ${{ needs.setup.outputs.race-id }}
+          RACERS: ${{ inputs.racers }}
+        run: node load/host.mjs conduct --race "$RACE" --racers "$RACERS"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: load-host
+          path: |
+            course/e2e/reports/load/lobby.json
+            course/e2e/reports/load/screen.jsonl
+            course/e2e/reports/load/standings.json
+          retention-days: 14
+          if-no-files-found: ignore
+
+  report:
+    needs: [setup, racers, conductor]
+    if: always() && needs.setup.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: course/e2e
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: load-*
+          path: course/e2e/reports/load
+
+      - name: Report
+        env:
+          RACERS: ${{ inputs.racers }}
+        run: node load/report.mjs reports/load --racers "$RACERS"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: report
+          path: course/e2e/reports/load/report.md
+          retention-days: 30
+          if-no-files-found: ignore
+
+  cleanup:
+    needs: [setup, racers, conductor, report]
+    if: always() && needs.setup.outputs.race-id != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: course/e2e
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: course/e2e/package-lock.json
+
+      - run: npm ci
+
+      - name: Delete the racers, their sandboxes and the race
+        env:
+          RACE: ${{ needs.setup.outputs.race-id }}
+        run: node load/host.mjs cleanup --race "$RACE"
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: The machine, after (a restart or an OOM shows here)
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: flyctl machine list --app "$FLY_APP" && flyctl status --app "$FLY_APP" || true

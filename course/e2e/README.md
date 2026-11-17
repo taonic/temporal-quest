@@ -60,3 +60,22 @@ curl https://api.resend.com/emails -H "Authorization: Bearer $RESEND_API_KEY" \
 ```
 
 Without `RESEND_API_KEY` the run still works and says so; GitHub's own notifications then email a failed scheduled run to whoever last changed the workflow's `cron` line.
+
+## The Derby load test
+
+Not a tier: a full field of racers through a whole Derby race on the live site, each a real browser with a real sandbox, to see the site hold up before an event. It's run by hand (Actions → **Derby load test** → Run workflow: `.github/workflows/derby-load.yml`), never by the daily run. The plan and its pass table are in [.scratch/derby-load-test/spec.md](../../.scratch/derby-load-test/spec.md).
+
+- `load/host.mjs` is the host: it makes the race, starts it once the field's sandboxes are ready, watches it as the race screen does, saves the standings, and deletes everything after.
+- `load/derby-load.spec.mjs` is the racers (`load.config.mjs`): each joins with the code, waits in the stalls, plays Essentials through the guide and the Trip board to The Night Shift, and records every request's timing. Its answers come from `load/plan.mjs`, wrong on purpose now and then, so the report can check the standings.
+- `load/report.mjs` checks it all against the pass table: the run's summary, and `report.md`.
+
+One racer, watching it, against any site (`E2E_BASE_URL`):
+
+```bash
+cd course && npm run content && cd e2e
+RACE=$(node load/host.mjs setup --minutes 15 | tail -1)
+node load/host.mjs conduct --race $RACE --racers 1 &
+DERBY_CODE=$(node load/host.mjs code --race $RACE) DERBY_RACERS=1 npx playwright test -c load.config.mjs --headed
+node load/report.mjs reports/load --racers 1
+node load/host.mjs cleanup --race $RACE
+```
