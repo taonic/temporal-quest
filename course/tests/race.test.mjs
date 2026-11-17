@@ -275,3 +275,22 @@ test("reset clears the field and their accounts; removing a racer frees their co
   races.remove(id);
   assert.throws(() => races.race(id), /No such race/);
 });
+
+test("a racer's sandbox goes with them: removed, reset or deleted with the race", () => {
+  const { db, accounts, activity, clock } = setup();
+  const deleted = [];
+  const manager = { reset: async (learner) => deleted.push(learner) };
+  const races = new Races(db, { accounts, activity, manager, course: raceCourse(DATA), now: () => clock.now });
+  const { id } = races.create({ name: "Derby", joinCode: "DERBY42" });
+  const ana = races.join("DERBY42", jockey("Ana", "scarlet"));
+  races.removeRacer(ana.racer.id);
+  assert.deepEqual(deleted, [ana.user.id]);
+  const ben = races.join("DERBY42", jockey("Ben", "sky"));
+  races.reset(id);
+  assert.deepEqual(deleted, [ana.user.id, ben.user.id]);
+  const cy = races.join("DERBY42", jockey("Cy", "gold"));
+  races.fillGhosts(id);
+  races.remove(id);
+  // Ghosts have no account, and no sandbox.
+  assert.deepEqual(deleted, [ana.user.id, ben.user.id, cy.user.id]);
+});

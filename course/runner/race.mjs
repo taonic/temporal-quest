@@ -522,8 +522,12 @@ export class Races {
     this.#changed(racer.race_id);
   }
 
-  // A racer's account goes with them: it was only ever for the race.
+  // A racer's account goes with them: it was only ever for the race. So does their sandbox, as
+  // when an admin deletes a learner, in the background (Daytona takes a few seconds).
   #removeRacer(racer, admin) {
+    if (racer.user_id) {
+      this.manager?.reset(racer.user_id).catch((err) => console.log(`deleting racer ${racer.user_id}'s sandbox failed: ${err.message}`));
+    }
     if (racer.user_id && this.accounts.user(racer.user_id)) this.accounts.deleteUser(racer.user_id, admin);
     this.db.prepare("DELETE FROM racers WHERE id = ?").run(racer.id);
   }
