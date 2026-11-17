@@ -7,7 +7,8 @@ import { test } from "node:test";
 import { Accounts } from "../runner/accounts.mjs";
 import { Activity, catalogOf } from "../runner/activity.mjs";
 import { openDatabase } from "../runner/db.mjs";
-import { COUNTDOWN_MS, GRAZE_MS, PODIUM_DELAY_MS, Races, ghostEvents, quizXp, raceCourse } from "../runner/race.mjs";
+import { COUNTDOWN_MS, GRAZE_MS, MAX_RACERS, PODIUM_DELAY_MS, Races, ghostEvents, quizXp, raceCourse } from "../runner/race.mjs";
+import { SILKS } from "../web/src/race/avatars.js";
 
 const MIN = 60_000;
 
@@ -78,15 +79,29 @@ test("joining: no email, a user in the race's cohort, allowed, with a pit-pass t
   assert.equal(races.describeRacer(user.id).raceName, "Derby");
 });
 
-test("joining: names are unique (any case), each colour is taken once, and the code must exist", () => {
+test("joining: names are unique (any case), each colour and pattern is taken once, and the code must exist", () => {
   const { races } = setup();
   races.create({ name: "Derby", joinCode: "DERBY42" });
   races.join("DERBY42", jockey("Tao", "scarlet"));
   assert.throws(() => races.join("DERBY42", jockey("tao", "sky")), /already a tao/);
-  assert.throws(() => races.join("DERBY42", jockey("Ana", "scarlet")), /took that colour/);
-  assert.throws(() => races.join("NOPE99", jockey("Ana", "sky")), /isn't a race/);
-  assert.throws(() => races.join("DERBY42", jockey("Ana", "sky", { creature: "dragon" })), /Pick a jockey/);
-  assert.deepEqual(races.joinInfo("DERBY42").takenSilks, ["scarlet"]);
+  assert.throws(() => races.join("DERBY42", jockey("Ana", "scarlet")), /took those silks/);
+  races.join("DERBY42", jockey("Ana", "scarlet", { pattern: "stripes" }));
+  assert.throws(() => races.join("NOPE99", jockey("Bo", "sky")), /isn't a race/);
+  assert.throws(() => races.join("DERBY42", jockey("Bo", "sky", { creature: "dragon" })), /Pick a jockey/);
+  assert.deepEqual(races.joinInfo("DERBY42").takenSilks, [
+    { silks: "scarlet", pattern: "hoops" },
+    { silks: "scarlet", pattern: "stripes" },
+  ]);
+});
+
+test("a field is 40: a colour each with a pattern each, more riders than colours", () => {
+  const { races } = setup();
+  races.create({ name: "Derby", joinCode: "DERBY42" });
+  assert.equal(MAX_RACERS, 40);
+  const pairs = SILKS.flatMap((s) => ["hoops", "stripes"].map((pattern) => [s.id, pattern])).slice(0, MAX_RACERS);
+  pairs.forEach(([silks, pattern], i) => races.join("DERBY42", jockey(`Rider ${i}`, silks, { pattern })));
+  assert.equal(races.joinInfo("DERBY42").full, true);
+  assert.throws(() => races.join("DERBY42", jockey("One more", SILKS[0].id, { pattern: "stars" })), /field is full/);
 });
 
 test("phases: lobby, a countdown to the gun, racing, finished at the clock; access lasts a day after", () => {

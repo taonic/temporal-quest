@@ -28,7 +28,28 @@ const joined = ref(null); // { pitPass, race }
 const pitPass = ref("");
 const showResume = ref(false);
 
-const taken = computed(() => new Set(info.value?.takenSilks ?? []));
+// Silks are a colour and a pattern, each pair one rider's: what's taken, as "colour:pattern". (A
+// runner from before sent colours alone, each with every pattern.)
+const pairKey = (s, p) => `${s}:${p}`;
+const taken = computed(() => new Set((info.value?.takenSilks ?? []).flatMap((t) => (typeof t === "string" ? PATTERNS.map((p) => pairKey(t, p.id)) : [pairKey(t.silks, t.pattern)]))));
+const isTaken = (s, p) => taken.value.has(pairKey(s, p));
+const colourFull = (s) => PATTERNS.every((p) => isTaken(s, p.id));
+const colourWorn = (s) => PATTERNS.some((p) => isTaken(s, p.id));
+const pick = (list) => list[Math.floor(Math.random() * list.length)];
+
+// Silks nobody has: the picked ones if they're free, else the same colour in another pattern,
+// else a colour nobody wears yet (so jockeys look different while there are any), else any pair.
+function freeSilks() {
+  if (silks.value && !isTaken(silks.value, pattern.value)) return;
+  const samePattern = silks.value && PATTERNS.find((p) => !isTaken(silks.value, p.id));
+  if (samePattern) {
+    pattern.value = samePattern.id;
+    return;
+  }
+  const unworn = SILKS.find((s) => !colourWorn(s.id));
+  const pair = unworn ? [unworn.id, pattern.value] : SILKS.flatMap((s) => PATTERNS.map((p) => [s.id, p.id])).find(([s, p]) => !isTaken(s, p));
+  [silks.value, pattern.value] = pair ?? ["", pattern.value];
+}
 const coat = COATS[Math.floor(Math.random() * COATS.length)];
 const origin = window.location.host;
 
@@ -49,7 +70,7 @@ async function loadRace() {
   if (!code.value) return;
   try {
     info.value = await call(`/api/race/join?code=${encodeURIComponent(code.value)}`);
-    if (!silks.value || taken.value.has(silks.value)) silks.value = SILKS.find((s) => !taken.value.has(s.id))?.id ?? "";
+    freeSilks();
     if (!horse.value) horse.value = suggestHorseName(info.value.takenHorses);
     if (window.location.pathname !== `/join/${code.value}`) window.history.replaceState(null, "", `/join/${code.value}`);
   } catch (err) {
@@ -65,9 +86,10 @@ function submitCode() {
 
 function randomise() {
   creature.value = CREATURES[Math.floor(Math.random() * CREATURES.length)].id;
-  const free = SILKS.filter((s) => !taken.value.has(s.id));
-  if (free.length) silks.value = free[Math.floor(Math.random() * free.length)].id;
-  pattern.value = PATTERNS[Math.floor(Math.random() * PATTERNS.length)].id;
+  const unworn = SILKS.filter((s) => !colourWorn(s.id));
+  const free = SILKS.flatMap((s) => PATTERNS.map((p) => [s.id, p.id])).filter(([s, p]) => !isTaken(s, p));
+  if (unworn.length) [silks.value, pattern.value] = [pick(unworn).id, pick(PATTERNS).id];
+  else if (free.length) [silks.value, pattern.value] = pick(free);
   horse.value = suggestHorseName([...(info.value?.takenHorses ?? []), horse.value]);
 }
 
@@ -87,7 +109,7 @@ async function join() {
       await loadRace();
       await nextTick();
     }
-    error.value = err.code === "silks_taken" && silks.value ? "Someone just took that colour, so you've got another. Enter the stalls again, or pick your own." : err.message;
+    error.value = err.code === "silks_taken" && silks.value ? "Someone just took those silks, so you've got others. Enter the stalls again, or pick your own." : err.message;
   } finally {
     busy.value = false;
   }
@@ -130,7 +152,9 @@ onMounted(async () => {
   await loadRace();
 });
 
-watch(silks, () => (error.value = error.value.includes("colour") ? "" : error.value));
+// A colour whose pattern is taken moves to a free one of its patterns; a message about silks goes.
+watch(silks, freeSilks);
+watch([silks, pattern], () => (error.value = error.value.includes("silks") ? "" : error.value));
 </script>
 
 <template>
@@ -212,25 +236,37 @@ watch(silks, () => (error.value = error.value.includes("colour") ? "" : error.va
         </fieldset>
 
         <fieldset class="join-field">
-          <legend>Your silks <small>(one colour per rider)</small></legend>
+          <legend>Your silks <small>(a colour and pattern each)</small></legend>
           <div class="join-swatches">
             <button
               v-for="s in SILKS"
               :key="s.id"
               type="button"
               class="join-swatch"
-              :class="{ 'is-picked': silks === s.id, 'is-taken': taken.has(s.id) }"
+              :class="{ 'is-picked': silks === s.id, 'is-taken': colourFull(s.id) }"
               :style="{ background: s.color }"
-              :disabled="taken.has(s.id)"
+              :disabled="colourFull(s.id)"
               :aria-pressed="silks === s.id"
-              :title="taken.has(s.id) ? `${s.label}: taken` : s.label"
+              :title="colourFull(s.id) ? `${s.label}: taken, every pattern` : s.label"
               @click="silks = s.id"
             >
-              <span v-if="taken.has(s.id)" aria-hidden="true">✕</span>
+              <span v-if="colourFull(s.id)" aria-hidden="true">✕</span>
             </button>
           </div>
           <div class="join-patterns">
-            <button v-for="p in PATTERNS" :key="p.id" type="button" class="join-chip" :class="{ 'is-picked': pattern === p.id }" :aria-pressed="pattern === p.id" @click="pattern = p.id">{{ p.label }}</button>
+            <button
+              v-for="p in PATTERNS"
+              :key="p.id"
+              type="button"
+              class="join-chip"
+              :class="{ 'is-picked': pattern === p.id }"
+              :disabled="Boolean(silks) && isTaken(silks, p.id)"
+              :title="silks && isTaken(silks, p.id) ? `${p.label}: taken in this colour` : p.label"
+              :aria-pressed="pattern === p.id"
+              @click="pattern = p.id"
+            >
+              {{ p.label }}
+            </button>
           </div>
         </fieldset>
 
@@ -496,6 +532,12 @@ body:has(.join) {
 .join-chip.is-picked {
   border-color: #0f8b68;
   background: var(--success-soft);
+}
+
+.join-chip:disabled {
+  opacity: 0.35;
+  text-decoration: line-through;
+  cursor: not-allowed;
 }
 
 .join-reroll {

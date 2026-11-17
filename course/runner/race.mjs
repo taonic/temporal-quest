@@ -49,7 +49,10 @@ const PRESENT_MS = 3 * 60_000;
 export const GHOST_GRAZE_MS = 60_000;
 export { QUESTION_XP, QUIZ_SHARE, quizXp } from "../web/src/race/rules.js";
 export const DEFAULT_DURATION = 25;
-export const MAX_RACERS = SILKS.length;
+// A field: each rider's silks (a colour and a pattern) their own, so no two jockeys look the
+// same; 20 colours by 5 patterns has room for more than the screen does.
+export const MAX_RACERS = 40;
+const silksKey = (silks, pattern) => `${silks}:${pattern}`;
 export const GHOST_FIELD = 15;
 // Access ends this long after the clock runs out.
 const ACCESS_AFTER_MS = 24 * 3600_000;
@@ -477,18 +480,22 @@ export class Races {
     const racers = this.racers(race.id);
     const takenNames = new Set(racers.map((r) => r.name_key));
     const takenHorses = new Set(racers.map((r) => r.horse));
-    const takenSilks = new Set(racers.map((r) => r.silks));
+    // A colour nobody wears, as long as there is one; then a colour with a pattern nobody wears.
+    const worn = new Set(racers.map((r) => r.silks));
+    const takenSilks = new Set(racers.map((r) => silksKey(r.silks, r.pattern)));
     const want = Math.max(0, GHOST_FIELD - racers.length);
     const base = Math.floor(this.random() * 1e6) * 100;
     transaction(this.db, () => {
       for (let i = 0; i < want; i++) {
         const name = GHOST_NAMES.find((n) => !takenNames.has(n.toLowerCase()));
         const horse = HORSE_NAMES.find((n) => !takenHorses.has(n)) ?? `Ghost ${i + 1}`;
-        const silks = SILKS.find((s) => !takenSilks.has(s.id));
+        const pattern = PATTERNS[i % PATTERNS.length].id;
+        const silks = SILKS.find((s) => !worn.has(s.id)) ?? SILKS.find((s) => !takenSilks.has(silksKey(s.id, pattern)));
         if (!name || !silks) break;
         takenNames.add(name.toLowerCase());
         takenHorses.add(horse);
-        takenSilks.add(silks.id);
+        worn.add(silks.id);
+        takenSilks.add(silksKey(silks.id, pattern));
         // The second ghost is the first's twin (a photo finish); the fourth grazes.
         const script = i === 1 ? "twin" : i === 3 ? "grazer" : "normal";
         this.db
@@ -496,7 +503,7 @@ export class Races {
             `INSERT INTO racers (race_id, user_id, ghost, seed, script, name, name_key, horse, creature, silks, pattern, created_at)
              VALUES (?, NULL, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           )
-          .run(race.id, base + i, script, name, name.toLowerCase(), horse, CREATURES[(base / 100 + i * 5) % CREATURES.length].id, silks.id, PATTERNS[i % PATTERNS.length].id, this.now() + i);
+          .run(race.id, base + i, script, name, name.toLowerCase(), horse, CREATURES[(base / 100 + i * 5) % CREATURES.length].id, silks.id, pattern, this.now() + i);
       }
     });
     this.#changed(race.id);
@@ -541,7 +548,7 @@ export class Races {
     const { phase } = this.timing(race);
     return {
       race: { name: race.name, slug: race.slug, joinCode: race.join_code, phase },
-      takenSilks: racers.map((r) => r.silks),
+      takenSilks: racers.map((r) => ({ silks: r.silks, pattern: r.pattern })),
       takenHorses: racers.map((r) => r.horse),
       count: racers.length,
       full: racers.length >= MAX_RACERS,
@@ -565,7 +572,7 @@ export class Races {
       const racers = this.racers(race.id);
       if (racers.length >= MAX_RACERS) throw fail(409, "The field is full.", "full");
       if (racers.some((r) => r.name_key === cleanPerson.toLowerCase())) throw fail(409, `There's already a ${cleanPerson} in this race. Add an initial?`, "name_taken");
-      if (racers.some((r) => r.silks === silks)) throw fail(409, "Someone just took that colour. Pick another.", "silks_taken");
+      if (racers.some((r) => r.silks === silks && r.pattern === pattern)) throw fail(409, "Someone just took those silks, that colour with that pattern. Pick another.", "silks_taken");
       const now = this.now();
       const id = newLearnerId();
       const email = `racer-${crypto.randomBytes(8).toString("hex")}@derby.invalid`;

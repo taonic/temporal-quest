@@ -149,7 +149,7 @@ These run from the host's phone or laptop, never on the projector.
 **2026-11-11: built.** Server: `course/runner/race.mjs` (races, racers, scoring, ghosts), a migration in `runner/db.mjs`, routes in `runner/server.mjs`, tests in `course/tests/race.test.mjs`. Site: `course/web/src/race/` (the join page, the race screen, the racer's lobby and pill, the admin Events tab, the horse, the sound). Decisions made while building:
 
 - A racer's account has a made-up address (`racer-…@derby.invalid`) on the allowlist of the race's own cohort (path `essentials`). It is never imported from the browser, and the join page clears this browser's course storage.
-- The durian is drawn, since there's no emoji for it. The hornbill and the gibbon became a parrot and a monkey. There are 16 creatures and 20 silks colours, so a race takes up to 20 racers.
+- The durian is drawn, since there's no emoji for it. The hornbill and the gibbon became a parrot and a monkey. There are 16 creatures and 20 silks colours, so a race took up to 20 racers. (Since: 40, each with a colour and pattern of their own.)
 - Ghosts finish in about 4 to 6.5 minutes, and the grazer pauses for 2. A ghost grazes after 1 minute without progress, not 8, so a rehearsal shows it.
 - Sound is made with Web Audio (no files). The race screen needs one click before it can play.
 

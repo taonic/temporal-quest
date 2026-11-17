@@ -135,6 +135,31 @@ const MIGRATIONS = [
     UNIQUE (race_id, silks)
   );
   `,
+  // A field of 40: silks (a colour and a pattern) are each rider's own, not a colour. SQLite
+  // can't drop a constraint, so the table is rebuilt (nothing references it).
+  `
+  CREATE TABLE racers_new (
+    id INTEGER PRIMARY KEY,
+    race_id INTEGER NOT NULL REFERENCES races(id) ON DELETE CASCADE,
+    user_id TEXT UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+    ghost INTEGER NOT NULL DEFAULT 0,
+    seed INTEGER,
+    script TEXT,
+    name TEXT NOT NULL,
+    name_key TEXT NOT NULL,
+    horse TEXT NOT NULL,
+    creature TEXT NOT NULL,
+    silks TEXT NOT NULL,
+    pattern TEXT NOT NULL,
+    pit_pass TEXT UNIQUE,
+    created_at INTEGER NOT NULL,
+    UNIQUE (race_id, name_key),
+    UNIQUE (race_id, silks, pattern)
+  );
+  INSERT INTO racers_new SELECT id, race_id, user_id, ghost, seed, script, name, name_key, horse, creature, silks, pattern, pit_pass, created_at FROM racers;
+  DROP TABLE racers;
+  ALTER TABLE racers_new RENAME TO racers;
+  `,
 ];
 
 export function openDatabase(file) {
