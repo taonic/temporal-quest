@@ -57,7 +57,10 @@ primary_region = "sjc"
     port = 8081
     handlers = ["tls", "http"]
 
+# Dedicated CPUs, for a Derby: 20 racers each poll their board every 2.5 s (a Daytona command
+# apiece) and a shared CPU's burst allowance runs out under that; 4 GB for the terminals' and
+# the UI proxy's connections. It stops when idle all the same, so it's paid by the second.
 [[vm]]
-  cpu_kind = "shared"
+  cpu_kind = "performance"
   cpus = 2
-  memory_mb = 1024
+  memory_mb = 4096
