@@ -3,8 +3,10 @@
 # The plan, and what it checks: .scratch/derby-load-test/spec.md. The racers:
 # course/e2e/load/derby-load.spec.mjs.
 #
-#   setup ──┬── racers (a shard of racers a runner) ──┬── report
-#           └── conductor (the host, and the screen) ─┘   cleanup (always)
+#   setup ──┬── racers (a shard of racers a runner) ──────┬── report
+#           └── conductor (a race's host, and its screen) ─┘   cleanup (always)
+#
+# A race takes 40 riders; more, and they're split over races run at once, a conductor each.
 #
 # Needs the e2e tests' secrets: E2E_SIGNIN_KEY and E2E_ADMIN_EMAIL (the race's host). The repo is
 # public, and so are a run's logs and artifacts: the join code is masked, and only timings,
@@ -15,7 +17,7 @@ on:
   workflow_dispatch:
     inputs:
       racers:
-        description: Racers (20 is a full field)
+        description: Racers (40 is a full field; more run as several races at once)
         default: "20"
       shards:
         description: Runners to spread them over
@@ -55,7 +57,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
-      race-id: ${{ steps.race.outputs.race-id }}
+      race-ids: ${{ steps.race.outputs.race-ids }}
+      races: ${{ steps.race.outputs.races }}
       shards: ${{ steps.shards.outputs.shards }}
       per-shard: ${{ steps.shards.outputs.per-shard }}
     steps:
@@ -99,14 +102,15 @@ jobs:
           path: course/web/src/generated/course-data.json
           retention-days: 1
 
-      - name: Make the race
+      - name: Make the races
         id: race
         working-directory: course/e2e
         env:
           MINUTES: ${{ inputs.minutes }}
+          RACERS: ${{ inputs.racers }}
         run: |
           npm ci
-          node load/host.mjs setup --name "Load test" --minutes "$MINUTES"
+          node load/host.mjs setup --name "Load test" --minutes "$MINUTES" --racers "$RACERS"
 
       - uses: superfly/flyctl-actions/setup-flyctl@master
       - name: The machine, before
@@ -126,7 +130,7 @@ jobs:
       run:
         working-directory: course/e2e
     env:
-      RACE: ${{ needs.setup.outputs.race-id }}
+      RACES: ${{ needs.setup.outputs.race-ids }}
       DERBY_RACERS: ${{ inputs.racers }}
       DERBY_PER_SHARD: ${{ needs.setup.outputs.per-shard }}
       DERBY_SHARD: ${{ matrix.shard }}
@@ -152,11 +156,11 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: The join code, masked
+      - name: The join codes, masked
         run: |
-          code=$(node load/host.mjs code --race "$RACE")
-          echo "::add-mask::$code"
-          echo "DERBY_CODE=$code" >> "$GITHUB_ENV"
+          codes=$(node load/host.mjs code --race "$RACES")
+          for code in ${codes//,/ }; do echo "::add-mask::$code"; done
+          echo "DERBY_CODE=$codes" >> "$GITHUB_ENV"
 
       - name: Race
         run: |
@@ -180,6 +184,10 @@ jobs:
     needs: setup
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        race: ${{ fromJSON(needs.setup.outputs.races) }}
     defaults:
       run:
         working-directory: course/e2e
@@ -194,16 +202,18 @@ jobs:
 
       - run: npm ci
 
+      # The first race's host also reads how the machine holds up, for all of them.
       - name: Host the race
         env:
-          RACE: ${{ needs.setup.outputs.race-id }}
-          RACERS: ${{ inputs.racers }}
-        run: node load/host.mjs conduct --race "$RACE" --racers "$RACERS"
+          RACE: ${{ matrix.race.id }}
+          RACERS: ${{ matrix.race.racers }}
+          MACHINE: ${{ matrix.race.i == 0 && '--machine' || '' }}
+        run: node load/host.mjs conduct --race "$RACE" --racers "$RACERS" $MACHINE
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: load-host
+          name: load-host-${{ matrix.race.i }}
           path: |
             course/e2e/reports/load/lobby.json
             course/e2e/reports/load/screen.jsonl
@@ -247,7 +257,7 @@ jobs:
 
   cleanup:
     needs: [setup, racers, conductor, report]
-    if: always() && needs.setup.outputs.race-id != ''
+    if: always() && needs.setup.outputs.race-ids != ''
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -264,10 +274,10 @@ jobs:
 
       - run: npm ci
 
-      - name: Delete the racers, their sandboxes and the race
+      - name: Delete the racers, their sandboxes and the races
         env:
-          RACE: ${{ needs.setup.outputs.race-id }}
-        run: node load/host.mjs cleanup --race "$RACE"
+          RACES: ${{ needs.setup.outputs.race-ids }}
+        run: node load/host.mjs cleanup --race "$RACES"
 
       - uses: superfly/flyctl-actions/setup-flyctl@master
       - name: The machine, after (a restart or an OOM shows here)

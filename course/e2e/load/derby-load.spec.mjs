@@ -8,7 +8,8 @@
 // go to reports/load/racer-NN.jsonl; its plan and how it went, to racer-NN.json.
 //
 // Settings (load.config.mjs runs it; the workflow sets them):
-//   DERBY_CODE         the race's join code (required)
+//   DERBY_CODE         the race's join code (required); for more than a field (40), the races'
+//                      codes, comma-separated: racers 1–40 join the first, 41–80 the second…
 //   DERBY_RACERS       how many racers in all (20)
 //   DERBY_SHARD        this runner's shard, from 0, and DERBY_PER_SHARD racers on each (all of them)
 //   DERBY_PACE         rush (no thinking) or paced (5–20 s a beat, like people reading)
@@ -23,7 +24,8 @@ import { BASE_URL } from "../env.mjs";
 import { Learner, MINUTE, SECOND } from "../tests/learner.mjs";
 import { loadCourse, planFor } from "./plan.mjs";
 
-const CODE = process.env.DERBY_CODE ?? "";
+const CODES = (process.env.DERBY_CODE ?? "").split(",").map((c) => c.trim()).filter(Boolean);
+const FIELD = 40; // a race's riders at most (runner/race.mjs MAX_RACERS)
 const RACERS = Number(process.env.DERBY_RACERS || 20);
 const PER_SHARD = Number(process.env.DERBY_PER_SHARD || RACERS);
 const SHARD = Number(process.env.DERBY_SHARD || 0);
@@ -76,7 +78,8 @@ for (let i = 0; i < PER_SHARD; i++) {
   if (n > RACERS) break;
   test(`racer ${pad(n)} @load`, async ({ page, context }) => {
     test.setTimeout(75 * MINUTE);
-    expect(CODE, "DERBY_CODE: the race's join code").not.toBe("");
+    const CODE = CODES[Math.floor((n - 1) / FIELD)] ?? "";
+    expect(CODE, `DERBY_CODE: a join code for racer ${n} (a race for each ${FIELD})`).not.toBe("");
     fs.mkdirSync(OUT, { recursive: true });
     const plan = planFor(n, SEED, course);
     const result = { n, name: `Load ${pad(n)}`, plan, marks: {}, errors: [], outcome: "started" };

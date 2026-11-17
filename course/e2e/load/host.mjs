@@ -1,15 +1,18 @@
 // The Derby load test's host: what the race's host does from /admin, through the admin API.
 //
-//   node load/host.mjs setup [--name "Load test"] [--minutes 25]   a new race; prints its id
-//   node load/host.mjs code --race ID                              its join code (to mask)
+//   node load/host.mjs setup [--name "Load test"] [--minutes 25] [--racers 20]
+//        a race for each 40 racers (a field); prints their ids, comma-separated
+//   node load/host.mjs code --race ID[,ID…]                        their join codes (to mask)
 //   node load/host.mjs conduct --race ID --racers 20 [--join-minutes 10] [--ready-minutes 5]
-//        [--out reports/load]: waits for the field and their sandboxes, starts the race, watches
+//        [--machine] [--out reports/load]: waits for the field and their sandboxes, starts the race, watches
 //        it as the race screen does (recording each poll), and saves the final standings; all
-//        along, how the machine holds up (/api/admin/machine every 5 s, into machine.jsonl)
-//   node load/host.mjs cleanup --race ID                           racers, their sandboxes, the race
+//        along, with --machine, how the machine holds up (/api/admin/machine every 5 s, into
+//        machine.jsonl: one conductor's job, with several races)
+//   node load/host.mjs cleanup --race ID[,ID…]                     racers, their sandboxes, the races
 //
 // The admin is the e2e tests' (E2E_ADMIN_EMAIL, with E2E_SIGNIN_KEY unless it's the app's secret
-// admin address). Under GitHub Actions, setup writes race-id and slug to $GITHUB_OUTPUT.
+// admin address). Under GitHub Actions, setup writes race-ids (comma-separated) and races (each
+// one's index, id and racers, as JSON, for a matrix) to $GITHUB_OUTPUT.
 import fs from "node:fs";
 import path from "node:path";
 import { parseArgs } from "node:util";
@@ -26,6 +29,7 @@ const { positionals, values: opts } = parseArgs({
     racers: { type: "string", default: "20" },
     "join-minutes": { type: "string", default: "10" },
     "ready-minutes": { type: "string", default: "5" },
+    machine: { type: "boolean", default: false },
     out: { type: "string", default: "reports/load" },
   },
 });
@@ -62,19 +66,32 @@ function output(key, value) {
   if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, `${key}=${value}\n`);
 }
 
+const FIELD = 40; // a race's riders at most (runner/race.mjs MAX_RACERS)
+const ids = () => opts.race.split(",").map((id) => id.trim()).filter(Boolean);
+
 async function setup() {
   await wake();
   const api = await admin();
-  const name = `${opts.name} ${new Date().toISOString().slice(5, 16).replace("T", " ")}`;
-  const race = await call(api, "POST", "/api/admin/races", { name, durationMinutes: Number(opts.minutes), sound: false });
-  say(`race ${race.id} made: ${race.name}, ${race.durationMinutes} minutes`);
-  output("race-id", race.id);
-  console.log(race.id);
+  const racers = Number(opts.racers);
+  const count = Math.max(1, Math.ceil(racers / FIELD));
+  const stamp = new Date().toISOString().slice(5, 16).replace("T", " ");
+  const races = [];
+  for (let i = 0; i < count; i++) {
+    const name = `${opts.name} ${stamp}${count > 1 ? ` (${i + 1} of ${count})` : ""}`;
+    const race = await call(api, "POST", "/api/admin/races", { name, durationMinutes: Number(opts.minutes), sound: false });
+    say(`race ${race.id} made: ${race.name}, ${race.durationMinutes} minutes`);
+    races.push({ i, id: race.id, racers: Math.min(FIELD, racers - i * FIELD) });
+  }
+  output("race-ids", races.map((r) => r.id).join(","));
+  output("races", JSON.stringify(races));
+  console.log(races.map((r) => r.id).join(","));
 }
 
 async function code() {
   const api = await admin();
-  console.log((await detail(api, opts.race)).race.joinCode);
+  const codes = [];
+  for (const id of ids()) codes.push((await detail(api, id)).race.joinCode);
+  console.log(codes.join(","));
 }
 
 // Every 5 s until the field is in and its sandboxes are ready, the lobby as the host sees it,
@@ -91,6 +108,7 @@ async function conduct() {
   // route: nothing recorded).
   const machine = fs.createWriteStream(path.join(out, "machine.jsonl"));
   const sampler = setInterval(async () => {
+    if (!opts.machine) return;
     const res = await api.fetch("/api/admin/machine").catch(() => null);
     if (res?.ok()) machine.write(`${JSON.stringify(await res.json())}\n`);
   }, 5000);
@@ -120,7 +138,7 @@ async function conduct() {
     }
     await sleep(5000);
   }
-  fs.writeFileSync(path.join(out, "lobby.json"), JSON.stringify(lobby, null, 1));
+  fs.writeFileSync(path.join(out, "lobby.json"), JSON.stringify({ racers: want, polls: lobby }, null, 1));
   await call(api, "POST", "/api/admin/races/action", { id: Number(opts.race), action: "start" });
   const startedAt = Date.now();
   say("started");
@@ -152,8 +170,9 @@ async function conduct() {
   polls.end();
   clearInterval(sampler);
   machine.end();
-  const standings = (await detail(api, opts.race)).racers.map(({ name, horse, xp, stumbles, completed, rank, finishedAt, sandbox }) => ({ name, horse, xp, stumbles, completed, rank, finishedAt, sandbox }));
-  fs.writeFileSync(path.join(out, "standings.json"), JSON.stringify({ startedAt, endedAt: Date.now(), joinedBy, racers: standings }, null, 1));
+  const final = await detail(api, opts.race);
+  const standings = final.racers.map(({ name, horse, xp, stumbles, completed, rank, finishedAt, sandbox }) => ({ name, horse, xp, stumbles, completed, rank, finishedAt, sandbox }));
+  fs.writeFileSync(path.join(out, "standings.json"), JSON.stringify({ race: final.race.name, startedAt, endedAt: Date.now(), joinedBy, racers: standings }, null, 1));
   say(`finished: ${standings.length} racers, standings saved`);
 }
 
@@ -161,18 +180,21 @@ async function conduct() {
 // sandbox's deletion is waited on, so nothing is left running for Daytona to bill.
 async function cleanup() {
   const api = await admin();
-  let state;
-  try {
-    state = await detail(api, opts.race);
-  } catch (err) {
-    return say(`no race to clean up: ${err.message}`);
+  for (const id of ids()) {
+    let state;
+    try {
+      state = await detail(api, id);
+    } catch (err) {
+      say(`no race ${id} to clean up: ${err.message}`);
+      continue;
+    }
+    const racers = state.racers.filter((r) => r.userId);
+    for (const r of racers) {
+      await call(api, "DELETE", `/api/admin/learner?id=${encodeURIComponent(r.userId)}`).catch((err) => say(`deleting ${r.name}: ${err.message}`));
+    }
+    await call(api, "POST", "/api/admin/races/action", { id: Number(id), action: "delete" });
+    say(`deleted race ${id} and ${racers.length} racers, with their sandboxes`);
   }
-  const racers = state.racers.filter((r) => r.userId);
-  for (const r of racers) {
-    await call(api, "DELETE", `/api/admin/learner?id=${encodeURIComponent(r.userId)}`).catch((err) => say(`deleting ${r.name}: ${err.message}`));
-  }
-  await call(api, "POST", "/api/admin/races/action", { id: Number(opts.race), action: "delete" });
-  say(`deleted race ${opts.race} and ${racers.length} racers, with their sandboxes`);
 }
 
 const commands = { setup, code, conduct, cleanup };

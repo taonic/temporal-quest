@@ -1,5 +1,6 @@
 // The Derby load test's report: every racer's files (racer-NN.jsonl and .json, from each shard)
-// and the host's (lobby.json, screen.jsonl, standings.json), from a folder and its subfolders,
+// and each race's host's (lobby.json, screen.jsonl, standings.json; machine.jsonl from one of
+// them), from a folder and its subfolders,
 // checked against the spec's pass table. Writes report.md (and the run's summary, under GitHub
 // Actions), and exits 1 if anything failed.
 //
@@ -16,20 +17,20 @@ function files(root) {
   return fs.readdirSync(root, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? files(path.join(root, e.name)) : [path.join(root, e.name)]));
 }
 const all = files(dir);
-const readJson = (name) => {
-  const found = all.find((f) => path.basename(f) === name);
-  return found ? JSON.parse(fs.readFileSync(found, "utf8")) : null;
-};
+const readAll = (name) => all.filter((f) => path.basename(f) === name).map((f) => JSON.parse(fs.readFileSync(f, "utf8")));
 const lines = (file) => fs.readFileSync(file, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
 
 const racers = all.filter((f) => /racer-\d+\.json$/.test(f)).map((f) => JSON.parse(fs.readFileSync(f, "utf8"))).sort((a, b) => a.n - b.n);
 const rows = all.filter((f) => /(racer-\d+|screen)\.jsonl$/.test(f)).flatMap(lines);
 const http = rows.filter((r) => r.kind === "http" || r.who === "screen");
 const actions = rows.filter((r) => r.kind === "action");
-const standings = readJson("standings.json");
-const lobby = readJson("lobby.json");
-const machineFile = all.find((f) => path.basename(f) === "machine.jsonl");
-const machine = machineFile ? lines(machineFile) : [];
+// A race for each 40 racers: their standings as one, each one's lobby apart.
+const raceStandings = readAll("standings.json");
+const standings = raceStandings.length
+  ? { startedAt: Math.min(...raceStandings.map((s) => s.startedAt)), endedAt: Math.max(...raceStandings.map((s) => s.endedAt)), racers: raceStandings.flatMap((s) => s.racers.map((r) => ({ ...r, race: s.race }))) }
+  : null;
+const lobbies = readAll("lobby.json").map((l) => (Array.isArray(l) ? { racers: want, polls: l } : l));
+const machine = all.filter((f) => path.basename(f) === "machine.jsonl").flatMap(lines);
 
 const quantile = (xs, q) => {
   if (!xs.length) return null;
@@ -146,17 +147,20 @@ if (machine.length) {
   row("Runner memory (MB)", machine.map((m) => m.memoryMb.rss));
   row("VM memory used (MB)", machine.map((m) => m.memoryMb.total - m.memoryMb.free));
 }
-if (lobby?.length) {
-  const allReady = lobby.find((l) => (l.sandboxes.ready ?? 0) >= want);
-  out.push("", "## The stalls", "", `First join to every sandbox ready: ${allReady ? ms(allReady.at - first) : "never"}. The lobby as the host saw it, from when it opened:`, "");
+lobbies.forEach(({ racers: field, polls: lobby }, i) => {
+  if (!lobby.length) return;
+  const allReady = lobby.find((l) => (l.sandboxes.ready ?? 0) >= field);
+  out.push("", `## The stalls${lobbies.length > 1 ? `, race ${i + 1}` : ""}`, "", `${field} racers. First join to every sandbox ready: ${allReady ? ms(allReady.at - first) : "never"}. The lobby as the host saw it, from when it opened:`, "");
   const step = Math.max(1, Math.floor(lobby.length / 12));
-  for (const l of lobby.filter((_, i) => i % step === 0 || i === lobby.length - 1)) out.push(`- +${ms(l.at - lobby[0].at)}: ${l.racers} in${Object.keys(l.sandboxes).length ? `, sandboxes ${Object.entries(l.sandboxes).map(([k, v]) => `${v} ${k}`).join(", ")}` : ""}`);
-}
+  for (const l of lobby.filter((_, j) => j % step === 0 || j === lobby.length - 1)) out.push(`- +${ms(l.at - lobby[0].at)}: ${l.racers} in${Object.keys(l.sandboxes).length ? `, sandboxes ${Object.entries(l.sandboxes).map(([k, v]) => `${v} ${k}`).join(", ")}` : ""}`);
+});
 if (standings) {
-  out.push("", "## Final standings", "", "| Rank | Racer | XP | Slips | Stops | Expected |", "|---|---|---|---|---|---|");
-  for (const s of [...standings.racers].sort((a, b) => a.rank - b.rank)) {
-    const e = racers.find((r) => r.name === s.name)?.plan.expected;
-    out.push(`| ${s.rank} | ${s.name} | ${s.xp} | ${s.stumbles} | ${s.completed} | ${e ? `${e.xp} XP, ${e.stumbles} slips` : "–"} |`);
+  for (const race of [...new Set(standings.racers.map((s) => s.race))]) {
+    out.push("", `## Final standings${raceStandings.length > 1 ? `: ${race}` : ""}`, "", "| Rank | Racer | XP | Slips | Stops | Expected |", "|---|---|---|---|---|---|");
+    for (const s of standings.racers.filter((x) => x.race === race).sort((a, b) => a.rank - b.rank)) {
+      const e = racers.find((r) => r.name === s.name)?.plan.expected;
+      out.push(`| ${s.rank} | ${s.name} | ${s.xp} | ${s.stumbles} | ${s.completed} | ${e ? `${e.xp} XP, ${e.stumbles} slips` : "–"} |`);
+    }
   }
 }
 const text = `${out.join("\n")}\n`;

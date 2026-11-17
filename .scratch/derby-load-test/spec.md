@@ -2,7 +2,7 @@
 
 Status: needs-triage
 
-Before the Derby, find out whether the live site holds up with a full field: **20 racers** at once, each in a real browser with a real sandbox, plus the race screen on a projector and the host's admin page. 20 is also the cap (`MAX_RACERS`, one per silks colour), so this test is the event at full size, with no headroom.
+Before the Derby, find out whether the live site holds up with a full field: **20 racers** at once, each in a real browser with a real sandbox, plus the race screen on a projector and the host's admin page. 20 was the cap then (`MAX_RACERS`, one per silks colour); it's 40 now (a colour and pattern each), so 20 leaves headroom, and the test goes on to 30 and 40.
 
 We drive real browsers with Playwright, as the e2e suite already does, so the test covers what a racer's laptop actually does: the join page, the lobby's sandbox warm-up, the Trip board's polls and actions, the Temporal UI iframe, the race pill and the race screen.
 
