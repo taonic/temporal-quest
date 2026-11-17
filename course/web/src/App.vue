@@ -132,9 +132,13 @@ watch(
   () => store.theme,
   (theme) => {
     document.documentElement.dataset.theme = theme;
-    save("theme", theme);
   },
   { immediate: true },
+);
+// Kept only once picked (not on load), so a browser that never chose follows the default.
+watch(
+  () => store.theme,
+  (theme) => save("theme-choice", theme),
 );
 
 watch(

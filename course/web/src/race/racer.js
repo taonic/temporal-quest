@@ -7,10 +7,10 @@ import { storageKey, storagePrefix } from "../forget.js";
 
 export function startRacing(race) {
   try {
-    const theme = localStorage.getItem(storageKey("theme"));
+    const theme = localStorage.getItem(storageKey("theme-choice"));
     for (const key of Object.keys(localStorage)) if (key.startsWith(`${storagePrefix}:`)) localStorage.removeItem(key);
     sessionStorage.clear();
-    if (theme) localStorage.setItem(storageKey("theme"), theme);
+    if (theme) localStorage.setItem(storageKey("theme-choice"), theme);
     localStorage.setItem(storageKey("persona"), JSON.stringify("essentials"));
     localStorage.setItem(storageKey("intro-seen-at"), JSON.stringify(Date.now()));
     localStorage.setItem(storageKey("race-slug"), JSON.stringify(race?.slug ?? null));

@@ -32,10 +32,12 @@ export function save(key, value) {
   }
 }
 
+// Dark, unless this browser's person picked light. Only a pick is kept ("theme-choice"), so the
+// default reaches everyone who never chose. ("theme" was every first visit's system theme, kept
+// whether chosen or not: it's ignored now.)
 function initialTheme() {
-  const saved = load("theme", null);
-  if (saved === "light" || saved === "dark") return saved;
-  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  const chosen = load("theme-choice", null);
+  return chosen === "light" ? "light" : "dark";
 }
 
 // #/ (the map), #/setup, #/module/A4 (the exercise page that has it, at its first beat),

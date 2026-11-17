@@ -4,6 +4,7 @@
 // gets you back in on another device. Then the course, as a racer (startRacing).
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 
+import { storageKey } from "../forget.js";
 import Horse from "./Horse.vue";
 import { COATS, CREATURES, HORSE_MAX, NAME_MAX, PATTERNS, SILKS, normalizeCode, suggestHorseName } from "./avatars.js";
 import { startRacing } from "./racer.js";
@@ -116,8 +117,14 @@ async function copyPitPass() {
 }
 
 onMounted(async () => {
-  const dark = window.matchMedia?.("(prefers-color-scheme: dark)").matches;
-  document.documentElement.dataset.theme = dark ? "dark" : "light";
+  // As the course: dark, unless this browser's person picked light there.
+  let chosen = null;
+  try {
+    chosen = JSON.parse(localStorage.getItem(storageKey("theme-choice")));
+  } catch {
+    /* storage unavailable: dark */
+  }
+  document.documentElement.dataset.theme = chosen === "light" ? "light" : "dark";
   document.title = "Join the Derby";
   call("/api/session").then((s) => (session.value = s)).catch(() => {});
   await loadRace();
