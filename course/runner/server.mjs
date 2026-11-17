@@ -47,8 +47,9 @@ const feedback = new Feedback(db, { record: (...args) => activity.record(...args
 const mailer = createMailer(config, { log });
 const manager = new SandboxManager(config);
 const races = new Races(db, { accounts, activity, manager });
-// Joining a race and pit-passes, per IP: a room shares one, so it's generous.
-const raceTries = new RateLimiter({ perKey: 60, global: 100_000, windowMs: 15 * 60_000 });
+// Joining a race and pit-passes, per IP: a room shares one (the venue's Wi-Fi), so it's generous:
+// a full field of 40, five tries each (a colour someone took, a pit-pass on a second device).
+const raceTries = new RateLimiter({ perKey: 200, global: 100_000, windowMs: 15 * 60_000 });
 const terminals = new TerminalHub(manager);
 const llm = createLlmPassthrough(config, { onCall: (learner) => activity.countModelCall(learner) });
 const distDir = config.distDir ? path.resolve(config.distDir) : null;
