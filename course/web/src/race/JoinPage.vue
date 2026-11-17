@@ -2,7 +2,7 @@
 // Joining the Derby (/join/<code>, or /join to type the code): your name, then build your jockey
 // (a creature, silks, a horse name), and you're in the stalls. No email: the pit-pass it gives you
 // gets you back in on another device. Then the course, as a racer (startRacing).
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 
 import Horse from "./Horse.vue";
 import { COATS, CREATURES, HORSE_MAX, NAME_MAX, PATTERNS, SILKS, normalizeCode, suggestHorseName } from "./avatars.js";
@@ -79,9 +79,14 @@ async function join() {
   try {
     joined.value = await call("/api/race/join", { code: code.value, name: name.value, horse: horse.value, creature: creature.value, silks: silks.value, pattern: pattern.value });
   } catch (err) {
-    error.value = err.message;
-    // Someone took the colour meanwhile: show what's free now.
-    if (["silks_taken", "full"].includes(err.code)) await loadRace();
+    // Someone took the colour meanwhile: show what's free now. Reloading the race clears the
+    // message, and so does the colour moving to a free one, so it's said after both: else the
+    // click looks like it did nothing.
+    if (["silks_taken", "full"].includes(err.code)) {
+      await loadRace();
+      await nextTick();
+    }
+    error.value = err.code === "silks_taken" && silks.value ? "Someone just took that colour, so you've got another. Enter the stalls again, or pick your own." : err.message;
   } finally {
     busy.value = false;
   }
