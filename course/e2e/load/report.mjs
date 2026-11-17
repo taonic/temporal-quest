@@ -28,6 +28,8 @@ const http = rows.filter((r) => r.kind === "http" || r.who === "screen");
 const actions = rows.filter((r) => r.kind === "action");
 const standings = readJson("standings.json");
 const lobby = readJson("lobby.json");
+const machineFile = all.find((f) => path.basename(f) === "machine.jsonl");
+const machine = machineFile ? lines(machineFile) : [];
 
 const quantile = (xs, q) => {
   if (!xs.length) return null;
@@ -77,6 +79,17 @@ check("No 5xx from the site", serverErrors.length === 0, `${serverErrors.length}
 const pageErrors = racers.flatMap((r) => r.errors.filter((e) => e.startsWith("page:")));
 check("No errors in the page", pageErrors.length === 0, `${pageErrors.length}${[...new Set(pageErrors)].slice(0, 5).map((s) => `\n  - ${s}`).join("")}`);
 
+// The machine: is it big enough? The runner's JavaScript runs on one core, so its CPU (100 is a
+// core) and how late its event loop runs say more than the VM's core count does.
+if (machine.length) {
+  const loopP99 = quantile(machine.map((m) => m.eventLoopMs.p99), 0.95);
+  check("The runner's event loop: p99 delay under 100 ms (95% of readings)", loopP99 < 100, `${ms(loopP99)}; worst reading ${ms(Math.max(...machine.map((m) => m.eventLoopMs.max)))}`);
+  const cpu95 = quantile(machine.map((m) => m.cpuPercent), 0.95);
+  check("The runner's CPU under 70% of a core (95% of readings)", cpu95 < 70, `${cpu95}% (p95), ${Math.max(...machine.map((m) => m.cpuPercent))}% at most`);
+  const mem = Math.max(...machine.map((m) => (m.memoryMb.total - m.memoryMb.free) / m.memoryMb.total));
+  check("Memory under 75% of the VM", mem < 0.75, `${Math.round(mem * 100)}% at most; the runner ${Math.max(...machine.map((m) => m.memoryMb.rss))} MB of ${machine[0].memoryMb.total} MB`);
+}
+
 // The standings, against what each racer's planned answers should score.
 const wrong = [];
 if (standings) {
@@ -121,6 +134,17 @@ for (const r of racers) for (const [what, at] of Object.entries(r.marks)) {
 if (Object.keys(seen).length) {
   out.push("", "## Each module, entering it to its check passing", "", "| Module | Racers | p50 | Max |", "|---|---|---|---|");
   for (const id of Object.keys(seen).sort((a, b) => Number(a.slice(1)) - Number(b.slice(1)))) out.push(`| ${id} | ${seen[id].length} | ${ms(quantile(seen[id], 0.5))} | ${ms(Math.max(...seen[id]))} |`);
+}
+if (machine.length) {
+  const cores = machine[0].cores;
+  out.push("", "## The machine", "", `${cores} cores, ${machine[0].memoryMb.total} MB. A reading every 5 s, each over the 5 s before it.`, "", "| | p50 | p95 | Max |", "|---|---|---|---|");
+  const row = (name, xs, unit = "") => out.push(`| ${name} | ${quantile(xs, 0.5)}${unit} | ${quantile(xs, 0.95)}${unit} | ${Math.max(...xs)}${unit} |`);
+  row("Runner CPU (100% is a core)", machine.map((m) => m.cpuPercent), "%");
+  row("Event loop delay, p99 (ms)", machine.map((m) => m.eventLoopMs.p99));
+  row("Event loop delay, max (ms)", machine.map((m) => m.eventLoopMs.max));
+  row(`Load average, 1 min (of ${cores} cores)`, machine.map((m) => m.loadAverage[0]));
+  row("Runner memory (MB)", machine.map((m) => m.memoryMb.rss));
+  row("VM memory used (MB)", machine.map((m) => m.memoryMb.total - m.memoryMb.free));
 }
 if (lobby?.length) {
   const allReady = lobby.find((l) => (l.sandboxes.ready ?? 0) >= want);

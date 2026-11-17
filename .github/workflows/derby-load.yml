@@ -208,6 +208,7 @@ jobs:
             course/e2e/reports/load/lobby.json
             course/e2e/reports/load/screen.jsonl
             course/e2e/reports/load/standings.json
+            course/e2e/reports/load/machine.jsonl
           retention-days: 14
           if-no-files-found: ignore
 

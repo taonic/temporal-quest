@@ -2,6 +2,7 @@
 // access requests, learners and their journeys, the activity feed, feedback, and the sandboxes.
 import { DEFAULT_ALLOWANCE_MINUTES, ROLES } from "./accounts.mjs";
 import { deriveProgress } from "./activity.mjs";
+import { createMachineStats } from "./machine.mjs";
 
 const fail = (status, message) => Object.assign(new Error(message), { status });
 
@@ -20,7 +21,7 @@ const iso = (ms) => (ms ? new Date(ms).toISOString() : "");
 // /admin lists, counts and exports, unless it asks for them (?internal=1, "Show internal").
 const withInternal = (url) => url?.searchParams.get("internal") === "1";
 
-export function createAdmin({ accounts, activity, feedback, manager, mailer, readJson, sessionOf, siteOrigin, log = () => {} }) {
+export function createAdmin({ accounts, activity, feedback, manager, mailer, readJson, sessionOf, siteOrigin, log = () => {}, machine = createMachineStats() }) {
   const catalog = activity.catalog;
 
   function requireAdmin(req) {
@@ -244,6 +245,11 @@ export function createAdmin({ accounts, activity, feedback, manager, mailer, rea
   return {
     requireAdmin,
     routes: {
+      // How the machine is holding up since the last reading (machine.mjs): for a load test.
+      "GET /api/admin/machine": async (req) => {
+        requireAdmin(req);
+        return machine();
+      },
       "GET /api/admin/overview": async (req, _res, url) => {
         requireAdmin(req);
         return {

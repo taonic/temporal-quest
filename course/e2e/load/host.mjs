@@ -4,7 +4,8 @@
 //   node load/host.mjs code --race ID                              its join code (to mask)
 //   node load/host.mjs conduct --race ID --racers 20 [--join-minutes 10] [--ready-minutes 5]
 //        [--out reports/load]: waits for the field and their sandboxes, starts the race, watches
-//        it as the race screen does (recording each poll), and saves the final standings
+//        it as the race screen does (recording each poll), and saves the final standings; all
+//        along, how the machine holds up (/api/admin/machine every 5 s, into machine.jsonl)
 //   node load/host.mjs cleanup --race ID                           racers, their sandboxes, the race
 //
 // The admin is the e2e tests' (E2E_ADMIN_EMAIL, with E2E_SIGNIN_KEY unless it's the app's secret
@@ -86,6 +87,13 @@ async function conduct() {
   const out = path.resolve(opts.out);
   fs.mkdirSync(out, { recursive: true });
   const lobby = [];
+  // The machine's own view, every 5 s from the lobby to the end (an older runner without the
+  // route: nothing recorded).
+  const machine = fs.createWriteStream(path.join(out, "machine.jsonl"));
+  const sampler = setInterval(async () => {
+    const res = await api.fetch("/api/admin/machine").catch(() => null);
+    if (res?.ok()) machine.write(`${JSON.stringify(await res.json())}\n`);
+  }, 5000);
   const joinBy = Date.now() + Number(opts["join-minutes"]) * 60_000;
   let joinedBy = null;
   let readyBy = null;
@@ -142,6 +150,8 @@ async function conduct() {
     await sleep(2000);
   }
   polls.end();
+  clearInterval(sampler);
+  machine.end();
   const standings = (await detail(api, opts.race)).racers.map(({ name, horse, xp, stumbles, completed, rank, finishedAt, sandbox }) => ({ name, horse, xp, stumbles, completed, rank, finishedAt, sandbox }));
   fs.writeFileSync(path.join(out, "standings.json"), JSON.stringify({ startedAt, endedAt: Date.now(), joinedBy, racers: standings }, null, 1));
   say(`finished: ${standings.length} racers, standings saved`);
