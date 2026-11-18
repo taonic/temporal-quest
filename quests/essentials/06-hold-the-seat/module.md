@@ -38,19 +38,17 @@ The traveler has found a flight, but wants a few days to decide. The airline wil
 
 Three days is a long time for a program to keep track of something. Machines are restarted, new versions are rolled out, and power goes out.
 
-## 1. Start a trip that holds the seat
+## 1. Start a trip, and pull the plug while it waits
 
 [Start a trip](#board/start-trip)
 
-The trip finds a flight, holds the seat, and then waits. The board counts the wait down: three days, sped up to 30 seconds for this demo.
+The trip finds a flight, holds the seat, and then waits. The board counts the wait down: three days, sped up to 30 seconds for this demo. Once the seat is held, pull the plug:
 
-## 2. Pull the plug while it waits
-
-[Pull the plug](#board/pull-plug)
+[Pull the plug](#board/pull-plug/after-hold_seat "Pull the plug once the seat is held")
 
 Nobody is on shift now. Watch the countdown: it keeps going. The clock isn't the coordinator's. It's Temporal's, and it's written into the trip's logbook.
 
-## 3. Put a coordinator on shift after the wait
+## 2. Put a coordinator on shift after the wait
 
 Let the countdown run out with nobody on shift, if you like, and then:
 

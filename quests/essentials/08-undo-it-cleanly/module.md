@@ -91,10 +91,25 @@ Think of a process in your own work that takes more than a moment and touches ot
 <button class="button button-primary" type="button" data-ask-own>✦ Ask Temporal about it</button>
 </div>
 
+## The words, in one place
+
+Every part of the story has a name in Temporal:
+
+<dl class="glossary">
+<dt>Workflow</dt><dd><span class="glossary-story">the trip</span> Its steps, run start to finish.</dd>
+<dt>Activity</dt><dd><span class="glossary-story">a booking</span> A step that talks to the outside world.</dd>
+<dt>Worker</dt><dd><span class="glossary-story">the coordinator</span> A program that does the steps.</dd>
+<dt>Event history</dt><dd><span class="glossary-story">the logbook</span> What's done, kept in Temporal.</dd>
+<dt>Retry policy</dt><dd><span class="glossary-story">the airline's bad minute</span> How a failing step tries again.</dd>
+<dt>Durable timer</dt><dd><span class="glossary-story">the three-day hold</span> A wait Temporal keeps.</dd>
+<dt>Signal</dt><dd><span class="glossary-story">the manager's yes</span> A message to a running workflow.</dd>
+<dt>Saga</dt><dd><span class="glossary-story">the declined card</span> Undoing finished steps, newest first.</dd>
+</dl>
+
 ## That's Essentials
 
-You've seen a trip on Temporal survive a mistake, a failing airline, an empty office, a crash, a three-day wait, a manager's approval and a declined card, and never lose its place or do a step twice.
+You've seen a trip on Temporal survive a mistake, a failing airline, an empty office, a crash, a three-day wait, a manager's approval and a declined card, and never lose its place or do a step twice. Engineers call that **durable execution**.
 
-Next time an engineer mentions workflows, activities, workers, an event history or a retry policy, you'll know what they mean, and why it matters.
+Next time an engineer mentions workflows, activities, workers, signals or an event history, you'll know what they mean, and why it matters.
 
 [Share this with your team](#share) [Switch to the developer track](#persona/developer)

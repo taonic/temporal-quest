@@ -36,21 +36,19 @@ questions:
 
 This trip is expensive, so company policy says a manager has to approve it before anything is booked. You're the manager.
 
-## 1. Start the trip
+## 1. Start the trip, and pull the plug before you answer
 
 [Start a trip](#board/start-trip)
 
 The trip finds a flight, and then stops to wait for your answer. While it waits, nothing is running. It could wait for minutes or for weeks, and it would cost the same.
 
-## 2. Pull the plug before you answer
-
 Before you answer, pull the plug:
 
-[Pull the plug](#board/pull-plug)
+[Pull the plug](#board/pull-plug/after-find_flight "Pull the plug once it's waiting for your answer")
 
 Nobody is on shift now. The trip is still waiting for you, in the safe.
 
-## 3. Approve it, with nobody on shift
+## 2. Approve it, with nobody on shift
 
 Give your answer anyway:
 
@@ -60,7 +58,7 @@ The approval is written into the trip's logbook straight away, though no coordin
 
 [Open the trip's logbook](#latest-trip)
 
-## 4. Put a coordinator on shift
+## 3. Put a coordinator on shift
 
 [Put a coordinator on shift](#board/start-worker)
 
