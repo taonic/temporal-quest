@@ -35,6 +35,10 @@ function next() {
   fight.value = advance(fight.value);
 }
 
+// What the meters count, said under them.
+const toWin = computed(() => (fight.value ? `${fight.value.hp} right ${fight.value.hp === 1 ? "answer" : "answers"} to win` : ""));
+const heartsLeft = computed(() => (fight.value ? `${fight.value.hearts} ${fight.value.hearts === 1 ? "heart" : "hearts"} left · a wrong answer costs one` : ""));
+
 const done = computed(() => isDone(props.id));
 const LETTERS = "ABCD";
 </script>
@@ -45,13 +49,21 @@ const LETTERS = "ABCD";
       <header class="boss-head">
         <p class="eyebrow">Boss · {{ branch.name }}</p>
         <h1 id="boss-title">{{ boss.title }}</h1>
+        <!-- Each meter says what it counts: the bars are right answers still to get, the hearts the
+             wrong answers you can still afford. -->
         <div v-if="fight" class="boss-meters">
-          <div class="boss-hp" role="meter" :aria-valuenow="fight.hp" aria-valuemin="0" :aria-valuemax="BOSS_HP" :aria-label="`The boss: ${fight.hp} of ${BOSS_HP}`">
-            <span :key="`b-${hit}`" :class="['boss-face', { 'is-hit': last?.right }]" aria-hidden="true">🌙</span>
-            <span v-for="n in BOSS_HP" :key="n" :class="['boss-seg', { 'is-gone': n > fight.hp }]" />
+          <div class="boss-meter">
+            <div class="boss-hp" role="meter" :aria-valuenow="fight.hp" aria-valuemin="0" :aria-valuemax="BOSS_HP" :aria-label="toWin">
+              <span :key="`b-${hit}`" :class="['boss-face', { 'is-hit': last?.right }]" aria-hidden="true">🌙</span>
+              <span v-for="n in BOSS_HP" :key="n" :class="['boss-seg', { 'is-gone': n > fight.hp }]" />
+            </div>
+            <p class="boss-meter-label" aria-hidden="true">{{ toWin }}</p>
           </div>
-          <div class="boss-hearts" role="meter" :aria-valuenow="fight.hearts" aria-valuemin="0" :aria-valuemax="HEARTS" :aria-label="`Your hearts: ${fight.hearts} of ${HEARTS}`">
-            <span v-for="n in HEARTS" :key="`${n}-${n > fight.hearts ? hit : 0}`" :class="['boss-heart', { 'is-lost': n > fight.hearts }]" aria-hidden="true">{{ n > fight.hearts ? "🖤" : "❤️" }}</span>
+          <div class="boss-meter is-hearts">
+            <div class="boss-hearts" role="meter" :aria-valuenow="fight.hearts" aria-valuemin="0" :aria-valuemax="HEARTS" :aria-label="heartsLeft">
+              <span v-for="n in HEARTS" :key="`${n}-${n > fight.hearts ? hit : 0}`" :class="['boss-heart', { 'is-lost': n > fight.hearts }]" aria-hidden="true">{{ n > fight.hearts ? "🖤" : "❤️" }}</span>
+            </div>
+            <p class="boss-meter-label" aria-hidden="true">{{ heartsLeft }}</p>
           </div>
         </div>
       </header>
@@ -60,7 +72,7 @@ const LETTERS = "ABCD";
       <div v-if="!fight" class="boss-intro">
         <p class="boss-teaser">{{ boss.teaser }}</p>
         <ul class="boss-rules">
-          <li><span aria-hidden="true">🌙</span> The night shift has {{ BOSS_HP }} HP. Each right answer knocks one off.</li>
+          <li><span aria-hidden="true">🌙</span> Get {{ BOSS_HP }} right to see the night shift through. Each right answer takes a bar off its moon.</li>
           <li><span aria-hidden="true">❤️</span> You have {{ HEARTS }} hearts. Each wrong answer costs one, and says why.</li>
           <li><span aria-hidden="true">🔁</span> Lose them all and you start again, with new stories.</li>
         </ul>

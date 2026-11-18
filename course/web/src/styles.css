@@ -8345,6 +8345,7 @@ a.menu-item {
   font-weight: 750;
   text-transform: uppercase;
   letter-spacing: 0.03em;
+  white-space: nowrap;
 }
 .tb-who.is-temporal {
   color: var(--temporal-uv);
@@ -9286,7 +9287,7 @@ a.menu-item {
 .boss-meters {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 10px 20px;
   margin-bottom: 14px;
@@ -9296,6 +9297,27 @@ a.menu-item {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+.boss-meter-label {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 650;
+}
+
+.boss-meter.is-hearts {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+}
+
+@media (max-width: 520px) {
+  .boss-meter.is-hearts {
+    align-items: flex-start;
+    text-align: left;
+  }
 }
 
 .boss-face {
