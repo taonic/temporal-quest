@@ -4,8 +4,9 @@
 //
 //   the console      /sbx/console/*  on the course's own origin. Its page uses relative
 //                    paths, so a prefix works. Chat and session updates stream as SSE.
-//   the Temporal UI  every path, on the UI proxy's port: it uses root-absolute paths, so it
-//                    needs an origin of its own. Same host, so the session cookie reaches it.
+//   the Temporal UI  every path, on the UI proxy's origin: it uses root-absolute paths, so it
+//                    needs one of its own. Locally a second port of the same host; deployed,
+//                    a subdomain (ui.…) the session cookie names its parent domain to reach.
 //
 // Adapted from the loan-origination course's runner (scripts/course-sandbox-runner.mjs),
 // which worked out the cookie, CSP and SvelteKit navigation details for the Temporal UI.

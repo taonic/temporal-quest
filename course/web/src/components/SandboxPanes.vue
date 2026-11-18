@@ -1,7 +1,7 @@
 <script setup>
 // The sandbox's web UIs, each in one long-lived iframe, as views of the workspace beside Code
 // (ExercisePage's tabs choose one): the Agent UI (the harness's console, proxied under
-// /sbx/console/ on this origin), the Temporal UI (on the UI proxy's port), and in exercise 3 the
+// /sbx/console/ on this origin), the Temporal UI (on the UI proxy's origin), and in exercise 3 the
 // trip briefing form (the console's server serves it, at /sbx/console/briefing). A view that
 // isn't showing is only hidden, so none reloads or loses its place.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";

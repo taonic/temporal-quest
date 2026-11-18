@@ -6,8 +6,8 @@ The runbook for hosting the browser course (`course/`) for an event: first deplo
 
 ```
 learner's browser ──▶ Fly app: temporal-quest  (one machine, one Node process)
-                        :443  the site, /api, the model passthrough (/llm/v1)
-                        :8081 the Temporal UI proxy
+                        temporalquest.dev     the site, /api, the model passthrough (/llm/v1)
+                        ui.temporalquest.dev  the Temporal UI proxy (both on :443)
                               │
                               ├──▶ Daytona: one sandbox per learner (1 vCPU / 2 GB, from a snapshot)
                               └──▶ Gemini: the agents' model and Ask Temporal

@@ -1,5 +1,7 @@
-# The course site, its /api and the sandboxes' model passthrough on 8080, and the Temporal UI
-# proxy on 8081 (it needs an origin of its own; same host, so the session cookie reaches it).
+# The course site, its /api and the sandboxes' model passthrough, and the Temporal UI proxy, all
+# on 8080. The UI needs an origin of its own: ui.temporalquest.dev (UI_PROXY_PUBLIC_BASE), on
+# 443 like the site, so networks that allow only 80 and 443 reach it; the session cookie names
+# temporalquest.dev to reach it too. It needs its certificate: course/DEPLOY.md.
 # Deploy from the repo root (it's the build context: the image carries the workshop's files):
 #
 #   fly deploy . --config course/fly.toml --dockerfile course/Dockerfile \
@@ -17,6 +19,7 @@ primary_region = "sjc"
   HOST = "0.0.0.0"
   PORT = "8080"
   PUBLIC_URL = "https://temporalquest.dev"
+  UI_PROXY_PUBLIC_BASE = "https://ui.temporalquest.dev"
   MAX_SANDBOXES = "100"
   LLM_MODEL = "gemini-3.8-flash"
   DATABASE_PATH = "/data/quest.db"
@@ -44,18 +47,6 @@ primary_region = "sjc"
     grace_period = "10s"
     method = "GET"
     path = "/api/health"
-
-[[services]]
-  internal_port = 8081
-  protocol = "tcp"
-  auto_stop_machines = "stop"
-  auto_start_machines = true
-  min_machines_running = 0
-  processes = ["app"]
-
-  [[services.ports]]
-    port = 8081
-    handlers = ["tls", "http"]
 
 # Dedicated CPUs, for a Derby: 20 racers each poll their board every 2.5 s (a Daytona command
 # apiece) and a shared CPU's burst allowance runs out under that; 4 GB for the terminals' and

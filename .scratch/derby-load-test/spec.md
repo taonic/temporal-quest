@@ -16,7 +16,7 @@ What the code does per racer, and where it lands:
 | `GET /api/sandbox/poll?board=1`, every 2.5 s (`ExercisePage.vue`) | ~8 a second | The Fly machine, then **one Daytona `executeCommand` each**, running `board.py state` (Python, `timeout 10`) in the sandbox |
 | `POST /api/sandbox/action` (a board button) | Bursts, as a room moves through a module together | Daytona exec, starting trips and workers in the sandbox |
 | `GET /api/race/state`, every 2 s (pill, screen, host) | ~11 a second | The Fly machine. Cached for `STATE_CACHE_MS`, so cheap |
-| Temporal UI iframe (E4, E7 point at it) | 20 UIs, proxied | The Fly machine's port 8081 proxy |
+| Temporal UI iframe (E4, E7 point at it) | 20 UIs, proxied | The Fly machine's UI proxy (ui.temporalquest.dev) |
 | Ask Temporal (optional) | Spiky | Gemini, and Kapa: **50 searches a minute across everyone** |
 | Join and pit-pass resume | 20, plus retries | **60 per IP per 15 minutes.** A venue's Wi-Fi is one IP, and so is the laptop running this test |
 

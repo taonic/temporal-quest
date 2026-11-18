@@ -14,7 +14,7 @@ import { WebSocketServer } from "ws";
 import { Accounts, DEFAULT_ALLOWANCE_MINUTES, E2E_EMAIL } from "./accounts.mjs";
 import { Activity } from "./activity.mjs";
 import { createAdmin } from "./admin.mjs";
-import { clearedSessionCookie, learnerFromRequest, sessionCookie, sessionToken } from "./auth.mjs";
+import { clearedSessionCookies, learnerFromRequest, sessionCookies, sessionToken, sessionTokenOf } from "./auth.mjs";
 import { config, consoleSignIn, consoleSignInAllows, helperUnavailableReason, runtimeUnavailableReason, signInUnavailableReason } from "./config.mjs";
 import { openDatabase } from "./db.mjs";
 import { Feedback } from "./feedback.mjs";
@@ -97,6 +97,15 @@ async function readJson(req, limit = 2 * 1024 * 1024) {
 
 function isHttps(req) {
   return (req.headers["x-forwarded-proto"] ?? "").split(",")[0].trim() === "https" || Boolean(req.socket.encrypted);
+}
+
+function signIn(req, res, userId) {
+  res.setHeader("set-cookie", sessionCookies(sessionToken(config.sessionSecret, userId), { secure: isHttps(req), domain: config.sessionCookieDomain }));
+}
+
+// Is this request for the UI proxy's subdomain (served on the main port too)?
+function forUiHost(req) {
+  return Boolean(config.uiProxyHost) && String(req.headers.host ?? "").toLowerCase() === config.uiProxyHost;
 }
 
 // The origins the learner's browser uses: the course site, and the UI proxy beside it.
@@ -192,11 +201,16 @@ async function serveStatic(req, res, urlPath) {
 const routes = {
   "GET /api/health": async () => ({ ok: true, runtime: { enabled: !runtimeUnavailableReason() }, ...uiProxyInfo() }),
 
-  "GET /api/session": async (req) => {
+  "GET /api/session": async (req, res) => {
     const reason = runtimeUnavailableReason();
     const helperReason = helperUnavailableReason();
     const signInReason = signInUnavailableReason();
     const session = sessionOf(req);
+    // A cookie from before the UI proxy moved to its subdomain is host-only, and doesn't reach
+    // it: the same token again, naming the domain (the token keeps its sign-in time).
+    if (session && config.sessionCookieDomain) {
+      res.setHeader("set-cookie", sessionCookies(sessionTokenOf(req), { secure: isHttps(req), domain: config.sessionCookieDomain }));
+    }
     return {
       // idleMinutes: Daytona stops a sandbox idle this long; a page with nobody at it lets go of
       // its sandbox after as long (store.js releaseIfIdle).
@@ -218,7 +232,7 @@ const routes = {
     const { email: raw } = await readJson(req);
     const admin = accounts.secretAdmin(raw);
     if (admin) {
-      res.setHeader("set-cookie", sessionCookie(sessionToken(config.sessionSecret, admin.id), { secure: isHttps(req) }));
+      signIn(req, res, admin.id);
       activity.record(admin.id, "sign_in", null, { via: "secret admin" });
       log(`sign-in for learner ${admin.id}, with the secret admin address`);
       const session = accounts.sessionUser(admin.id);
@@ -246,7 +260,7 @@ const routes = {
       if (err.code === "wrong_code") activity.record(accounts.userByEmail(String(email).trim().toLowerCase())?.id ?? null, "code_failed", null, null);
       throw err;
     }
-    res.setHeader("set-cookie", sessionCookie(sessionToken(config.sessionSecret, user.id), { secure: isHttps(req) }));
+    signIn(req, res, user.id);
     activity.record(user.id, "sign_in", null, null);
     log(`sign-in for learner ${user.id}`);
     const session = accounts.sessionUser(user.id);
@@ -272,7 +286,7 @@ const routes = {
   "DELETE /api/session": async (req, res) => {
     const id = learnerFromRequest(config.sessionSecret, req);
     if (id && accounts.user(id)) activity.record(id, "sign_out", null, null);
-    res.setHeader("set-cookie", clearedSessionCookie({ secure: isHttps(req) }));
+    res.setHeader("set-cookie", clearedSessionCookies({ secure: isHttps(req), domain: config.sessionCookieDomain }));
     return { authenticated: false };
   },
 
@@ -301,7 +315,7 @@ const routes = {
     limitRace(req);
     const body = await readJson(req, 8 * 1024);
     const { user, racer } = races.join(body.code, body);
-    res.setHeader("set-cookie", sessionCookie(sessionToken(config.sessionSecret, user.id), { secure: isHttps(req) }));
+    signIn(req, res, user.id);
     log(`race: ${racer.name} joined race ${racer.race_id} as learner ${user.id}`);
     return { pitPass: racer.pit_pass, race: races.describeRacer(user.id) };
   },
@@ -310,7 +324,7 @@ const routes = {
   "POST /api/race/resume": async (req, res) => {
     limitRace(req);
     const user = races.resume((await readJson(req, 4 * 1024)).pitPass);
-    res.setHeader("set-cookie", sessionCookie(sessionToken(config.sessionSecret, user.id), { secure: isHttps(req) }));
+    signIn(req, res, user.id);
     activity.record(user.id, "sign_in", null, { via: "pit-pass" });
     return { race: races.describeRacer(user.id) };
   },
@@ -521,7 +535,7 @@ async function handleConsoleProxy(req, res, url) {
   }
 }
 
-const uiProxyServer = http.createServer(async (req, res) => {
+async function handleUiProxy(req, res) {
   try {
     const learner = requireLearner(req);
     const base = await manager.previewFor(learner, TEMPORAL_UI_PORT);
@@ -529,11 +543,15 @@ const uiProxyServer = http.createServer(async (req, res) => {
   } catch (err) {
     if (err.name !== "AbortError") proxyError(res, err);
   }
-});
+}
+
+// Its own port (local dev), and its subdomain on the main one (deployed).
+const uiProxyServer = http.createServer(handleUiProxy);
 
 // --- The main server ----------------------------------------------------------------------
 
 const server = http.createServer(async (req, res) => {
+  if (forUiHost(req)) return handleUiProxy(req, res);
   const url = new URL(req.url ?? "/", "http://course.local");
   try {
     if (url.pathname.startsWith("/llm/v1/")) return await llm(req, res, url.pathname.slice("/llm/v1/".length));
@@ -552,6 +570,7 @@ const server = http.createServer(async (req, res) => {
 
 const wss = new WebSocketServer({ noServer: true, maxPayload: 1024 * 1024 });
 server.on("upgrade", async (req, socket, head) => {
+  if (forUiHost(req)) return socket.end("HTTP/1.1 404 Not Found\r\n\r\n");
   const url = new URL(req.url ?? "/", "http://course.local");
   const lsp = url.pathname === "/api/lsp";
   const name = url.pathname.match(/^\/api\/terminal\/([a-z]+)$/)?.[1];

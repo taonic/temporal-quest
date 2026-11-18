@@ -1,6 +1,6 @@
 # Deploying the course site
 
-One [Fly.io](https://fly.io) app, `temporal-quest`, runs the site and its runner in one Node process: the site and `/api` on port 443 (8080 inside), and the Temporal UI proxy on port 8081. Learners' sandboxes run on Daytona; Fly only proxies to them, so the machine stays small. Users, the allowlist and the activity log are in SQLite on a Fly volume (`quest_data`, mounted at `/data`).
+One [Fly.io](https://fly.io) app, `temporal-quest`, runs the site and its runner in one Node process: the site and `/api` on `temporalquest.dev`, and the Temporal UI proxy on `ui.temporalquest.dev`, both on port 443 (8080 inside). Learners' sandboxes run on Daytona; Fly only proxies to them, so the machine stays small. Users, the allowlist and the activity log are in SQLite on a Fly volume (`quest_data`, mounted at `/data`).
 
 ## What it needs
 
@@ -16,7 +16,7 @@ One [Fly.io](https://fly.io) app, `temporal-quest`, runs the site and its runner
 | `E2E_SIGNIN_KEY` | the e2e tests' sign-in: their addresses (`e2e+…@temporalquest.dev`) get no email, and sign in with a code derived from this key. The same value as the repository secret of that name |
 | `KAPA_API_KEY` | optional. An API key for Temporal's Kapa project: Ask Temporal searches the docs with it for everyone, and nobody has to verify with GitHub or Google. Without it, each learner connects their own (free) Kapa sign-in once |
 
-Settings in `fly.toml` (`[env]`): `PUBLIC_URL` (where sandboxes reach the model passthrough), `MAX_SANDBOXES` (100; 40 if unset), `LLM_MODEL`, `DATABASE_PATH` (`/data/quest.db`, on the volume). `MAIL_FROM` (`Temporal Quest <signin@temporalquest.dev>`) is the sender. Others, with their defaults, are in `runner/config.mjs`: `SANDBOX_AUTO_STOP_MINUTES` (30), `SANDBOX_TTL_MINUTES` (1440), `LLM_RATE_PER_SANDBOX` (20 a minute), `LLM_RATE_GLOBAL` (300 a minute), `SANDBOX_SNAPSHOT` (to pin one).
+Settings in `fly.toml` (`[env]`): `PUBLIC_URL` (where sandboxes reach the model passthrough), `UI_PROXY_PUBLIC_BASE` (`https://ui.temporalquest.dev`: the Temporal UI proxy. A subdomain of `PUBLIC_URL`'s host, so the session cookie names that host to reach it), `MAX_SANDBOXES` (100; 40 if unset), `LLM_MODEL`, `DATABASE_PATH` (`/data/quest.db`, on the volume). `MAIL_FROM` (`Temporal Quest <signin@temporalquest.dev>`) is the sender. Others, with their defaults, are in `runner/config.mjs`: `SANDBOX_AUTO_STOP_MINUTES` (30), `SANDBOX_TTL_MINUTES` (1440), `LLM_RATE_PER_SANDBOX` (20 a minute), `LLM_RATE_GLOBAL` (300 a minute), `SANDBOX_SNAPSHOT` (to pin one).
 
 Ask Temporal's, also in `runner/config.mjs`: `HELPER_MODEL` (defaults to `LLM_MODEL`), `HELPER_REASONING_EFFORT` (`low`; empty to leave it out), `HELPER_RATE_PER_LEARNER` (6 questions a minute), `HELPER_RATE_GLOBAL` (120 a minute), `KAPA_RATE_GLOBAL` (50 searches a minute: Kapa allows 60 a minute across all its users, and 600 a day per user), `KAPA_MCP_URL` (`https://temporal.mcp.kapa.ai/`). The helper needs `GEMINI_API_KEY` and a session, not Daytona, so learners working locally can use it too.
 
@@ -39,6 +39,16 @@ fly secrets set --app temporal-quest \
 # 3. Deploy, from course/ (it builds from the repo root)
 npm run deploy
 ```
+
+**The UI's subdomain.** The Temporal UI needs an origin of its own, and gets one on 443 like the site (a port of its own, such as 8081, is blocked by many office, VPN and venue networks). Give it a certificate, and point it at the app where the domain's DNS is (Cloudflare; "DNS only", not proxied, like the apex):
+
+```bash
+fly certs add ui.temporalquest.dev --app temporal-quest
+fly ips list --app temporal-quest      # ui: an A record to the v4, an AAAA record to the v6
+fly certs check ui.temporalquest.dev --app temporal-quest   # until it says Issued
+```
+
+Until it's issued, the Temporal UI tab can't load.
 
 **The sender.** In Resend, add the domain `temporalquest.dev` and put the DNS records it lists (SPF, DKIM) where the domain's DNS is. Until it's verified, Resend refuses to send from it, and nobody gets a code.
 

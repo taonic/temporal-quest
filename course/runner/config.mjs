@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { uiSubdomain } from "./auth.mjs";
 import { snapshotName } from "./repo-files.mjs";
 
 const env = process.env;
@@ -42,10 +43,13 @@ export const config = {
   // The built site, served from the same origin as /api in production. Unset in local dev,
   // where Vite serves the site and proxies to the runner.
   distDir: env.COURSE_DIST_DIR || null,
-  // The Temporal UI needs an origin of its own (it uses root-absolute paths), so it's
+  // The Temporal UI needs an origin of its own (it uses root-absolute paths). Locally, it's
   // proxied on a second port of the same host, which keeps the session cookie same-site.
+  // Deployed, UI_PROXY_PUBLIC_BASE names a subdomain of PUBLIC_URL's host (https://ui.…), which
+  // the main port serves too: networks that block every port but 80 and 443 still reach it.
   uiProxyPort: int("UI_PROXY_PORT", int("PORT", 8787) + 1),
   uiProxyPublicBase: trimSlash(env.UI_PROXY_PUBLIC_BASE),
+  ...uiSubdomain(trimSlash(env.UI_PROXY_PUBLIC_BASE), trimSlash(env.PUBLIC_URL)),
   // Where sandboxes reach this runner (the model passthrough). Defaults to the origin the
   // learner's browser used; set it when that origin isn't reachable from Daytona (local dev
   // behind a tunnel).

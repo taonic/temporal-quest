@@ -19,7 +19,7 @@ ENV NODE_ENV=production \
     PORT=8080 \
     COURSE_DIST_DIR=/repo/course/web/dist
 COPY --from=build /repo /repo
-EXPOSE 8080 8081
+EXPOSE 8080
 # Fly mounts the volume (/data, the database) owned by root: hand it to the node user, then run
 # the runner as that user.
 CMD ["sh", "-c", "if [ -d /data ]; then chown node:node /data; fi; exec runuser -u node -- node course/runner/server.mjs"]

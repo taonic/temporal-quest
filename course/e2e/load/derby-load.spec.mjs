@@ -99,12 +99,14 @@ for (let i = 0; i < PER_SHARD; i++) {
 
     // Every request to the site: how long it took, from the page's side.
     const host = new URL(BASE_URL).hostname;
+    // The Temporal UI proxy: its subdomain (deployed), or its own port (local).
+    const isUi = (url) => url.hostname === `ui.${host}` || (url.hostname === host && url.port === "8081");
     const sent = new Map();
     page.on("request", (req) => sent.set(req, Date.now()));
     const done = async (req, failed) => {
       const url = new URL(req.url());
-      if (url.hostname !== host) return;
-      const ui = url.port === "8081";
+      const ui = isUi(url);
+      if (url.hostname !== host && !ui) return;
       if (!ui && !url.pathname.startsWith("/api/")) return;
       const res = failed ? null : await req.response().catch(() => null);
       const status = res?.status() ?? -1;

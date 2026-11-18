@@ -86,25 +86,57 @@ export function parseCookies(header) {
   return out;
 }
 
-// Secure only over https, so plain-http local dev still gets the cookie. Host-only (no
-// Domain), so it reaches the UI proxy on the same host's other port as well.
-export function sessionCookie(token, { secure }) {
-  return [
-    `${SESSION_COOKIE}=${encodeURIComponent(token)}`,
-    "Path=/",
-    "HttpOnly",
-    "SameSite=Lax",
-    `Max-Age=${MAX_AGE_SECONDS}`,
-    ...(secure ? ["Secure"] : []),
-  ].join("; ");
+// Secure only over https, so plain-http local dev still gets the cookie. Host-only by default,
+// which reaches the UI proxy on the same host's other port (local dev). Deployed, the UI proxy
+// is a subdomain (ui.temporalquest.dev), and the cookie names the parent domain to reach it.
+function cookieAttributes({ secure, domain, maxAge }) {
+  return ["Path=/", ...(domain ? [`Domain=${domain}`] : []), "HttpOnly", "SameSite=Lax", `Max-Age=${maxAge}`, ...(secure ? ["Secure"] : [])];
 }
 
-export function clearedSessionCookie({ secure }) {
-  return [`${SESSION_COOKIE}=`, "Path=/", "HttpOnly", "SameSite=Lax", "Max-Age=0", ...(secure ? ["Secure"] : [])].join("; ");
+export function sessionCookie(token, { secure, domain = "" }) {
+  return [`${SESSION_COOKIE}=${encodeURIComponent(token)}`, ...cookieAttributes({ secure, domain, maxAge: MAX_AGE_SECONDS })].join("; ");
+}
+
+export function clearedSessionCookie({ secure, domain = "" }) {
+  return [`${SESSION_COOKIE}=`, ...cookieAttributes({ secure, domain, maxAge: 0 })].join("; ");
+}
+
+// The Set-Cookie headers that sign a browser in. With a domain, the host-only cookie from
+// before goes too: a browser holding both would send both, and the older could be someone
+// else's.
+export function sessionCookies(token, { secure, domain = "" }) {
+  const cookie = sessionCookie(token, { secure, domain });
+  return domain ? [clearedSessionCookie({ secure }), cookie] : [cookie];
+}
+
+// The Set-Cookie headers that sign a browser out: both cookies, when there's a domain.
+export function clearedSessionCookies({ secure, domain = "" }) {
+  return domain ? [clearedSessionCookie({ secure }), clearedSessionCookie({ secure, domain })] : [clearedSessionCookie({ secure })];
+}
+
+// When the UI proxy's public base is a subdomain of the site's (https://ui.example.com beside
+// https://example.com): the host the main port serves it on, and the domain the session
+// cookie names so that it reaches it. Otherwise neither, and the cookie stays host-only.
+export function uiSubdomain(uiBase, siteUrl) {
+  const none = { uiProxyHost: "", sessionCookieDomain: "" };
+  if (!uiBase || !siteUrl) return none;
+  try {
+    const ui = new URL(uiBase);
+    const site = new URL(siteUrl).hostname.toLowerCase();
+    if (!ui.hostname.toLowerCase().endsWith(`.${site}`)) return none;
+    return { uiProxyHost: ui.host.toLowerCase(), sessionCookieDomain: site };
+  } catch {
+    return none;
+  }
+}
+
+// The raw session token a request carries, or null.
+export function sessionTokenOf(req) {
+  return parseCookies(req.headers.cookie)[SESSION_COOKIE] ?? null;
 }
 
 export function learnerFromRequest(secret, req) {
-  return verifySessionToken(secret, parseCookies(req.headers.cookie)[SESSION_COOKIE]);
+  return verifySessionToken(secret, sessionTokenOf(req));
 }
 
 // A value the browser holds but can't read or change (the helper's docs token): AES-256-GCM

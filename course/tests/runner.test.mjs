@@ -3,6 +3,7 @@ import fs from "node:fs";
 import { test } from "node:test";
 
 import {
+  clearedSessionCookies,
   codeMatches,
   e2eSignInCode,
   learnerFromRequest,
@@ -10,7 +11,9 @@ import {
   newLearnerId,
   parseCookies,
   sessionCookie,
+  sessionCookies,
   sessionToken,
+  uiSubdomain,
   verifyLlmKey,
   verifySessionToken,
 } from "../runner/auth.mjs";
@@ -393,4 +396,36 @@ test("the poll reads the board's state when asked", async () => {
   assert.match(ran, /essentials\.board state/);
   assert.deepEqual(out.board, { worker: true });
   assert.equal((await manager.poll("learner", [])).board, undefined);
+});
+
+test("with the UI proxy on a subdomain, the session cookie names the site's domain, and the host-only one goes", () => {
+  const set = sessionCookies("t", { secure: true, domain: "temporalquest.dev" });
+  assert.equal(set.length, 2);
+  assert.match(set[0], /^course_session=;/);
+  assert.match(set[0], /Max-Age=0/);
+  assert.doesNotMatch(set[0], /Domain=/);
+  assert.match(set[1], /^course_session=t;/);
+  assert.match(set[1], /Domain=temporalquest\.dev/);
+  assert.match(set[1], /HttpOnly/);
+  assert.deepEqual(sessionCookies("t", { secure: true }), [sessionCookie("t", { secure: true })]);
+
+  const out = clearedSessionCookies({ secure: true, domain: "temporalquest.dev" });
+  assert.equal(out.length, 2);
+  assert.ok(out.every((c) => /Max-Age=0/.test(c)));
+  assert.match(out[1], /Domain=temporalquest\.dev/);
+  assert.equal(clearedSessionCookies({ secure: false }).length, 1);
+});
+
+test("the UI proxy's subdomain: served on the main port, and the cookie's domain, only under the site's host", () => {
+  assert.deepEqual(uiSubdomain("https://ui.temporalquest.dev", "https://temporalquest.dev"), {
+    uiProxyHost: "ui.temporalquest.dev",
+    sessionCookieDomain: "temporalquest.dev",
+  });
+  const none = { uiProxyHost: "", sessionCookieDomain: "" };
+  assert.deepEqual(uiSubdomain("https://temporalquest.dev:8081", "https://temporalquest.dev"), none);
+  assert.deepEqual(uiSubdomain("https://ui.example.com", "https://temporalquest.dev"), none);
+  assert.deepEqual(uiSubdomain("https://evil-temporalquest.dev", "https://temporalquest.dev"), none);
+  assert.deepEqual(uiSubdomain("", "https://temporalquest.dev"), none);
+  assert.deepEqual(uiSubdomain("https://ui.temporalquest.dev", ""), none);
+  assert.deepEqual(uiSubdomain("not a url", "https://temporalquest.dev"), none);
 });
