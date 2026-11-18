@@ -96,7 +96,7 @@ test.describe("Essentials, signed in", { tag: "@auth" }, () => {
     // To the end: the plain twin started over and booked twice; the Temporal trip, once.
     const scrub = recording.getByRole("slider", { name: "Where in the recording" });
     await scrub.fill((await scrub.getAttribute("max")) ?? "0");
-    await expect(page.locator(".tb-double").first()).toContainText("booked twice, by the plain program");
+    await expect(page.locator(".tb-double").first()).toContainText("booked twice, by the trip without Temporal");
     await expect(page.locator(".tb-run.is-temporal .tb-status")).toContainText("each one once");
     // A recording is watched, not done: it passes nothing.
     await expect(page.locator(".xp-pill")).toContainText("0 XP");

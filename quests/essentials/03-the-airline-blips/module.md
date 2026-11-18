@@ -3,7 +3,7 @@ id: E3
 title: "The airline's system blips"
 emoji: "✈️"
 note: "the airline goes quiet"
-teaser: "The airline's system fails for a while. Watch the trip keep trying, waiting a little longer each time, while the plain program gives up."
+teaser: "The airline's system fails for a while. Watch the Temporal trip keep trying, waiting a little longer each time, while the trip without Temporal gives up."
 learn: "Automatic retries: a trip on Temporal rides out a failing service by itself."
 minutes: 5
 xp: 10
@@ -17,11 +17,11 @@ check:
   waiting: Make the airline flaky, start a trip, and let it get through.
   seen: A trip got through though the airline failed it, every booking made once.
   quiz:
-    question: The airline was down for 20 seconds. Why did the Temporal trip get through when the plain program didn't?
+    question: The airline was down for 20 seconds. Why did the Temporal trip get through when the trip without Temporal didn't?
     choices:
       - label: It kept trying, waiting a little longer each time.
         right: true
-        explanation: Its retry policy has no limit on attempts, so it outlasted the bad minute. The plain program gave up after three quick tries.
+        explanation: Its retry policy has no limit on attempts, so it outlasted the bad minute. The trip without Temporal gave up after three quick tries.
       - label: Temporal has its own, more reliable connection to the airline's systems.
         explanation: Both trips called the same airline and got the same failures. The difference is what each did next.
       - label: It skipped the flight and came back for it later.
@@ -52,7 +52,7 @@ Then start a trip straight away, while it's still down:
 
 Both trips ask the airline for a flight, and get no answer.
 
-- **The plain twin** tries three times, quickly, and gives up. Nothing is booked, and nobody is on it.
+- **The trip without Temporal** tries three times, quickly, and gives up. Nothing is booked, and nobody is on it.
 - **The Temporal trip** keeps trying, waiting a little longer each time. Watch the attempts climb under "Finding a flight".
 
 When the airline is back, the next try gets through, and the trip carries on.
@@ -62,6 +62,6 @@ When the airline is back, the next try gets through, and the trip carries on.
 
 ## Why a bad minute matters
 
-Without Temporal, every program that calls another system has to handle its bad minutes itself, and each one does it a little differently, or not at all. Most give up after a few tries, like the plain twin, and leave a half-done order for someone to find.
+Without Temporal, every program that calls another system has to handle its bad minutes itself, and each one does it a little differently, or not at all. Most give up after a few tries, like the trip on the board did, and leave a half-done order for someone to find.
 
 With Temporal, riding out a blip is the default. Your engineers decide the policy once, and every trip follows it, however long the bad minute lasts.

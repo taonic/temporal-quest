@@ -1,6 +1,6 @@
 <script setup>
 // The Trip board: what an Essentials module shows in place of the editor and terminals. The
-// booking trip's logbook as steps that tick off, the coordinator on or off shift, the plain twin's
+// booking trip's logbook as steps that tick off, the coordinator on or off shift, the trip without Temporal's
 // trip beside it in the modules that have one, and the outside world, where every booking lands.
 // What to do to the trip is in the guide's text, as buttons (store.js boardAction), one place for
 // each: the board only offers Start over.
@@ -126,7 +126,7 @@ function startOver() {
 function openTrip(trip) {
   openPane("temporal", `/namespaces/default/workflows/${encodeURIComponent(trip.workflowId)}`);
 }
-const WHO = { temporal: "Temporal", plain: "Plain" };
+const WHO = { temporal: "Temporal", plain: "No Temporal" };
 const MARK = { done: "✓", active: "", retrying: "↻", todo: "", lost: "✕", failed: "✕", rejected: "✕", asking: "?" };
 </script>
 
@@ -207,8 +207,8 @@ const MARK = { done: "✓", active: "", retrying: "↻", todo: "", lost: "✕", 
             </template>
             <p :class="['tb-status', `is-${latest.temporal.status.tone}`]">{{ latest.temporal.status.text }}</p>
           </section>
-          <section v-if="latest.plain" class="tb-run is-plain" aria-label="The trip as a plain program">
-            <h4>Plain program <small>the same steps, no Temporal</small></h4>
+          <section v-if="latest.plain" class="tb-run is-plain" aria-label="The trip without Temporal">
+            <h4>Without Temporal <small>the same steps, no logbook</small></h4>
             <ol class="tb-steps">
               <li v-for="step in latest.plain.steps" :key="step.id" :class="['tb-step', `is-${step.state}`]">
                 <span class="tb-mark" aria-hidden="true">{{ MARK[step.state] }}</span>
@@ -225,14 +225,14 @@ const MARK = { done: "✓", active: "", retrying: "↻", todo: "", lost: "✕", 
         <ul>
           <li v-for="trip in older" :key="trip.id">
             <strong>{{ trip.title }}</strong> {{ trip.route }} · On Temporal: {{ trip.temporal.status.text }}
-            <template v-if="trip.plain"> · Plain: {{ trip.plain.status.text }}</template>
+            <template v-if="trip.plain"> · Without Temporal: {{ trip.plain.status.text }}</template>
           </li>
         </ul>
       </details>
 
       <section v-if="ready" class="tb-world" aria-label="The outside world">
         <h3>The outside world <small>every booking, as the airline, the hotel, the card network and the email service see it</small></h3>
-        <p v-for="d in view.world.doubles" :key="d.text" class="tb-double" role="status">⚠️ {{ d.text }}, by the plain program.</p>
+        <p v-for="d in view.world.doubles" :key="d.text" class="tb-double" role="status">⚠️ {{ d.text }}, by the trip without Temporal.</p>
         <div class="tb-systems">
           <div v-for="system in view.world.systems" :key="system.id" class="tb-system">
             <p class="tb-system-name"><span aria-hidden="true">{{ system.icon }}</span> {{ system.name }}</p>

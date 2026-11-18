@@ -91,11 +91,11 @@
       right: true
     - label: It starts over, booking the flight and the hotel a second time.
     - label: It stays stopped until someone on the team notices and restarts it.
-  why: The logbook says the flight and hotel are booked, so the next coordinator starts at the first step that isn't. That's the difference from the plain twin.
+  why: The logbook says the flight and hotel are booked, so the next coordinator starts at the first step that isn't. That's the difference from the trip without Temporal.
 
 - id: crash-why-safe
   module: E5
-  story: A plain program and a trip on Temporal both crash halfway. Only the Temporal trip carries on where it stopped. Why?
+  story: A trip without Temporal and a trip on Temporal both crash halfway. Only the Temporal trip carries on where it stopped. Why?
   choices:
     - label: Its logbook was in Temporal, not in the program's memory.
       right: true

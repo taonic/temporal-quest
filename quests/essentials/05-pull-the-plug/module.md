@@ -20,7 +20,7 @@ check:
     question: After the plug was pulled, why didn't the Temporal trip book the hotel a second time?
     choices:
       - label: The hotel spotted the second booking for the same guest and refused it.
-        explanation: Look at the outside world. The plain twin's second hotel booking went straight through. Nothing out there protects you.
+        explanation: Look at the outside world. The second hotel booking, by the trip without Temporal, went straight through. Nothing out there protects you.
       - label: The next coordinator read the logbook and carried on from the card.
         right: true
         explanation: The logbook survived the crash because it was never with the coordinator. It was in Temporal. So the next one knew exactly where to pick up.
@@ -40,14 +40,14 @@ Both trips set off: find a flight, book it, book the hotel. Once **"Booked the h
 
 [Pull the plug](#board/pull-plug/after-book_hotel "Pull the plug once the hotel is booked")
 
-- **The plain twin** has stopped. Everything it knew was in its memory, and that's gone.
+- **The trip without Temporal** has stopped. Everything it knew was in its memory, and that's gone.
 - **The Temporal trip** waits in the safe. Its logbook says the flight and the hotel are booked: next is "Charge the card".
 
 ## 2. Put a coordinator back on shift
 
 [Put a coordinator on shift](#board/start-worker)
 
-- **The plain twin** doesn't know how far it got, so it starts from the top and books the flight and the hotel again. Check the outside world.
+- **The trip without Temporal** doesn't know how far it got, so it starts from the top and books the flight and the hotel again. Check the outside world.
 - **The Temporal trip**'s new coordinator reads the logbook and carries on from the card. One flight, one hotel.
 
 <p class="eng-word"><span class="eng-word-kicker">What engineers call it</span> A new <strong>worker</strong> reads the <strong>event history</strong> and carries on from the first step that isn't finished.</p>
@@ -55,7 +55,7 @@ Both trips set off: find a flight, book it, book the hotel. Once **"Booked the h
 
 ## The memory nobody saved
 
-The plain program wasn't careless. It did keep track of how far it had got, in its memory, the way most programs do. A crash wipes memory, so starting over was the only safe thing it knew to do.
+The program without Temporal wasn't careless. It did keep track of how far it had got, in its memory, the way most programs do. A crash wipes memory, so starting over was the only safe thing it knew to do.
 
 On Temporal, the logbook is the memory. Everything the trip learns along the way, like which flight it found and what the hotel said, is written into it, so the next coordinator knows it too.
 

@@ -35,7 +35,7 @@ questions:
 
 ## The office is empty
 
-It's three in the morning, and nobody is on shift. Look at the board: no coordinator, and the plain program isn't running either.
+It's three in the morning, and nobody is on shift. Look at the board: no coordinator, and nothing running the trip without Temporal either.
 
 In real life, this happens all the time, and not only at night: while new software is being rolled out, when a server is restarted, or when a sudden rush of requests arrives faster than anyone can take them.
 
@@ -43,14 +43,14 @@ In real life, this happens all the time, and not only at night: while new softwa
 
 [Start a trip](#board/start-trip)
 
-- **The plain twin** wasn't running, so nobody received the request. It's lost. The customer is waiting for a confirmation that will never come.
+- **The trip without Temporal** had nothing running, so nobody received the request. It's lost. The customer is waiting for a confirmation that will never come.
 - **The Temporal trip** is written down, and it's waiting in the safe. Nothing has been booked yet, because nobody is there to book it, but nothing is lost either.
 
 ## 2. Put a coordinator on shift
 
 [Put a coordinator on shift](#board/start-worker)
 
-The coordinator opens the safe, finds the trip waiting, and gets to work from the first step. The plain twin's request stays lost: even with the program running again, it never knew about it.
+The coordinator opens the safe, finds the trip waiting, and gets to work from the first step. The trip without Temporal stays lost: even with its program running again, it never knew about the request.
 
 <p class="eng-word"><span class="eng-word-kicker">What engineers call it</span> The trip waits in Temporal, not in a <strong>worker</strong>. Workers can come and go, and work waits for one to be there to do it.</p>
 

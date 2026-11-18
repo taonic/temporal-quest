@@ -21,7 +21,7 @@ check:
     question: After the fix shipped, why wasn't the Temporal trip's flight booked a second time?
     choices:
       - label: The airline noticed the second booking for the same trip and refused it.
-        explanation: The outside world doesn't protect you like that. In the next modules, you'll see the plain twin book things twice, and nobody stops it.
+        explanation: The outside world doesn't protect you like that. In the next modules, you'll see the trip without Temporal book things twice, and nobody stops it.
       - label: The fix cancelled the first flight, then booked a fresh one in its place.
         explanation: Nothing was cancelled. Look at the outside world, where there's one flight for that trip, booked before the mistake.
       - label: Its logbook says the flight is booked, so it carried on from the hotel step.
@@ -33,9 +33,9 @@ questions:
   - How long would the Temporal trip wait for a fix?
 ---
 
-## Meet the plain twin
+## Meet the trip without Temporal
 
-From here on, a second trip runs beside the first. It's the **plain twin**: the same five steps, done by a plain program, written the way plenty of programs are, without Temporal. It books into the same outside world.
+From here on, a second trip runs beside the first: the same five steps, in a program written the way plenty of programs are, **without Temporal**. It books into the same outside world.
 
 Every button acts on both trips at once, so you can see the difference for yourself.
 
@@ -47,7 +47,7 @@ Someone has shipped a mistake in the hotel step, and nobody has noticed yet.
 
 Both trips book the flight, then fail at the hotel.
 
-- **The plain twin** crashes, and the trip is lost: a flight, no hotel, and nobody working on it.
+- **The trip without Temporal** crashes, and is lost: a flight, no hotel, and nobody working on it.
 - **The Temporal trip** pauses at the hotel and tries again every few seconds. The flight stays booked. It's waiting for a fix.
 
 
@@ -61,7 +61,7 @@ An engineer would fix the mistake. Here, one button does it:
 
 [Ship the fix](#board/ship-fix)
 
-The Temporal trip carries on from the hotel and finishes: the same trip, with the flight booked once. The plain twin's trip stays lost.
+The Temporal trip carries on from the hotel and finishes: the same trip, with the flight booked once. The trip without Temporal stays lost.
 
 See it finished, with the hotel step's last error and its tries still in the logbook:
 

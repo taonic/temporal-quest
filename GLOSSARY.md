@@ -44,7 +44,7 @@
 
 **Trip board**: what an Essentials module shows in place of the editor and terminals: the booking trip's logbook, the coordinator on or off shift, the outside world's bookings, and the buttons that act on them.
 
-**Plain twin**: the same trip as a plain program without Temporal, run beside the Temporal one in some Essentials modules so the learner sees what would have happened otherwise.
+**Plain twin**: the same trip as a plain program without Temporal, run beside the Temporal one in some Essentials modules so the learner sees what would have happened otherwise. Learners see it as **Without Temporal** ("the trip without Temporal"); "plain" is only the code's name for it (`plain.py`, `.is-plain`). Avoid "plain program" and "plain twin" in what learners read.
 
 **Question challenge**: a challenge whose choices are plain-language answers, with nothing run. Essentials' challenges are all question challenges.
 
