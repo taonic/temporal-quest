@@ -9299,6 +9299,20 @@ a.menu-item {
   gap: 4px;
 }
 
+.boss-race {
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--amber-soft);
+  font-weight: 650;
+}
+
+.boss-race.is-home {
+  background: var(--success-soft);
+  color: var(--success);
+  font-size: 17px;
+}
+
 .boss-meter-label {
   margin: 4px 0 0;
   color: var(--muted);

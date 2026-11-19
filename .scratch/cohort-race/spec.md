@@ -111,6 +111,8 @@ It's for the projector: it needs no sign-in and has no controls. It's laid out f
 
 - A **race pill** in the top bar: *"🐎 4th · 10 XP behind Durable Dancer"*.
 - After the boss, they see their final place and can watch the race on their own screen.
+  - **The finish line** (2026-11-19, `RaceFinish.vue`): once every stop is done, a card over the course says *"🏁 You've crossed the finish line!"*: their place so far, XP and slips, that their score is final and only their place can still change. When the race ends, *"🏁 The race is over"* with their final place. Each shows once per race, after any badge's earn moment. The pill then reads *"🏁 Finished · 3rd of 15 so far"*.
+  - Beating the boss with stops still to do says so on its win screen (*"Your race isn't finished yet: 1 stop left"*), linking the next.
 - Ask Temporal (⌘K) stays on.
 
 ## Host controls (on the event's `/admin` page)

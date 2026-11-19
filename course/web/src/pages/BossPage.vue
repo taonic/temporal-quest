@@ -8,6 +8,8 @@ import { computed, ref } from "vue";
 import { BOSS_HP, advance, answer, answered, current, drawFight } from "../boss.js";
 import { HEARTS } from "../badges.js";
 import { branchesById, finishBoss, isDone, moduleHref, modulesById } from "../progress.js";
+import { raceState } from "../race/racing.js";
+import { store } from "../store.js";
 
 const props = defineProps({ id: { type: String, required: true } });
 
@@ -39,6 +41,9 @@ function next() {
 const toWin = computed(() => (fight.value ? `${fight.value.hp} right ${fight.value.hp === 1 ? "answer" : "answers"} to win` : ""));
 const heartsLeft = computed(() => (fight.value ? `${fight.value.hearts} ${fight.value.hearts === 1 ? "heart" : "hearts"} left · a wrong answer costs one` : ""));
 
+// In the Derby: the race's stops not done yet, so a win says whether that was the last one.
+const raceLeft = computed(() => (store.race && raceState.value ? raceState.value.course.stops.filter((s) => !isDone(s.id)) : null));
+
 const done = computed(() => isDone(props.id));
 const LETTERS = "ABCD";
 </script>
@@ -57,13 +62,13 @@ const LETTERS = "ABCD";
               <span :key="`b-${hit}`" :class="['boss-face', { 'is-hit': last?.right }]" aria-hidden="true">🌙</span>
               <span v-for="n in BOSS_HP" :key="n" :class="['boss-seg', { 'is-gone': n > fight.hp }]" />
             </div>
-            <p class="boss-meter-label" aria-hidden="true">{{ toWin }}</p>
+            <p v-if="!fight.outcome" class="boss-meter-label" aria-hidden="true">{{ toWin }}</p>
           </div>
           <div class="boss-meter is-hearts">
             <div class="boss-hearts" role="meter" :aria-valuenow="fight.hearts" aria-valuemin="0" :aria-valuemax="HEARTS" :aria-label="heartsLeft">
               <span v-for="n in HEARTS" :key="`${n}-${n > fight.hearts ? hit : 0}`" :class="['boss-heart', { 'is-lost': n > fight.hearts }]" aria-hidden="true">{{ n > fight.hearts ? "🖤" : "❤️" }}</span>
             </div>
-            <p class="boss-meter-label" aria-hidden="true">{{ heartsLeft }}</p>
+            <p v-if="!fight.outcome" class="boss-meter-label" aria-hidden="true">{{ heartsLeft }}</p>
           </div>
         </div>
       </header>
@@ -85,9 +90,20 @@ const LETTERS = "ABCD";
         <p class="boss-end-big" aria-hidden="true">🌅</p>
         <h2>Morning. You saw the night shift through.</h2>
         <p>{{ rightCount }} right, with {{ fight.hearts }} of {{ HEARTS }} hearts left{{ fight.hearts === HEARTS ? ": flawless" : "" }}. Whatever breaks, you know what a trip on Temporal does next.</p>
+        <p v-if="raceLeft && !raceLeft.length" class="boss-race is-home">🏁 That was your last stop: your race is finished.</p>
+        <p v-else-if="raceLeft" class="boss-race">
+          🏇 Your race isn't finished yet: {{ raceLeft.length }} {{ raceLeft.length === 1 ? "stop" : "stops" }} left
+          (<template v-for="(s, i) in raceLeft" :key="s.id"><a :href="moduleHref(s.id)">{{ s.title }}</a>{{ i < raceLeft.length - 1 ? ", " : "" }}</template>).
+        </p>
         <div class="boss-actions">
-          <a class="button button-secondary" href="#/badges">See your badges</a>
-          <a class="button button-primary" href="#/">Back to the map</a>
+          <template v-if="raceLeft?.length">
+            <a class="button button-secondary" href="#/">Back to the map</a>
+            <a class="button button-primary" :href="moduleHref(raceLeft[0].id)">Next: {{ raceLeft[0].title }} <span aria-hidden="true">→</span></a>
+          </template>
+          <template v-else>
+            <a class="button button-secondary" href="#/badges">See your badges</a>
+            <a class="button button-primary" href="#/">Back to the map</a>
+          </template>
         </div>
       </div>
       <div v-else-if="fight.outcome === 'lost'" class="boss-end is-lost" role="status">

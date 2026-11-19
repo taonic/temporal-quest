@@ -22,7 +22,7 @@ const text = computed(() => {
   if (!m) return "The Derby";
   const place = `${ordinal(m.rank)} of ${field.value}`;
   if (phase.value === "finished") return `🏁 Final: ${place}`;
-  if (m.finishedAt) return `✅ Every stop done · ${place}`;
+  if (m.finishedAt) return `🏁 Finished · ${place} so far`;
   if (!m.xp && phase.value === "racing") return `🏇 ${place} · at the gate: go!`;
   if (m.rank === 1) {
     const gap = behind.value ? m.xp - behind.value.xp : 0;
@@ -57,7 +57,7 @@ const short = computed(() => {
   if (!m) return "🏇";
   const place = `${ordinal(m.rank)}/${field.value}`;
   if (phase.value === "finished") return `🏁 ${place}`;
-  if (m.finishedAt) return `✅ ${place}`;
+  if (m.finishedAt) return `🏁 ${place}`;
   const gap = ahead.value ? ahead.value.xp - m.xp : 0;
   return `🏇 ${place}${gap > 0 ? ` · −${gap}` : ""}`;
 });
@@ -83,8 +83,9 @@ const short = computed(() => {
           <span><strong>{{ ordinal(me.rank) }}</strong> of {{ field }}</span>
           <span><strong>{{ me.xp }}</strong> / {{ rules.max }} XP</span>
           <span>{{ slips(me.stumbles) }}</span>
+          <span v-if="phase === 'finished'">🏁 The race is over</span>
+          <span v-else-if="me.finishedAt">🏁 You've finished: every stop done</span>
           <span v-if="phase === 'racing'">⏱ {{ clock(left) }} left</span>
-          <span v-else-if="phase === 'finished'">🏁 Finished</span>
         </div>
 
         <h3>Scoring</h3>

@@ -16,8 +16,9 @@ import { shouldShowIntro } from "./intro.js";
 import BadgesPage from "./pages/BadgesPage.vue";
 import BossPage from "./pages/BossPage.vue";
 import RaceLobby from "./race/RaceLobby.vue";
+import RaceFinish from "./race/RaceFinish.vue";
 import RacePill from "./race/RacePill.vue";
-import { raceWaiting } from "./race/racing.js";
+import { finishOpen, raceWaiting } from "./race/racing.js";
 import ExercisePage from "./pages/ExercisePage.vue";
 import MapPage from "./pages/MapPage.vue";
 import SetupPage from "./pages/SetupPage.vue";
@@ -253,7 +254,7 @@ watch(() => store.user, (user) => !user && closeFeedback());
 </script>
 
 <template>
-  <div class="app-frame" :class="{ 'with-helper': helper.open, 'is-arriving': arriving }" :style="{ '--ask-width': `${helper.width}px` }" :inert="introOpen || raceWaiting">
+  <div class="app-frame" :class="{ 'with-helper': helper.open, 'is-arriving': arriving }" :style="{ '--ask-width': `${helper.width}px` }" :inert="introOpen || raceWaiting || finishOpen">
     <!-- On a module page the bar keeps to what the module needs: where you are, Next, your
          level, the sandbox and Ask Temporal. The tour, feedback and the theme are in your menu. -->
     <header class="topbar" :class="{ 'is-module': exercise }">
@@ -359,6 +360,7 @@ watch(() => store.user, (user) => !user && closeFeedback());
 
   <EarnMoment />
   <RaceLobby v-if="raceWaiting" />
+  <RaceFinish v-if="finishOpen" />
 
   <PersonaChoice v-if="personaFirst || store.personaPicker" :switching="!personaFirst" @close="store.personaPicker = false" />
 

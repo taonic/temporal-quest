@@ -68,6 +68,8 @@ export const store = reactive({
   personaPicker: false,
   theme: initialTheme(),
   toast: "",
+  // A badge's earn moment is on screen (EarnMoment.vue).
+  earnShowing: false,
 
   // The browser runtime, as the runner reports it.
   runtime: { checked: false, enabled: false, reason: "", idleMinutes: 30 },

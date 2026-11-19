@@ -15,6 +15,8 @@ import { badgesById, branchesById, progress } from "../progress.js";
 import { store } from "../store.js";
 
 const shown = ref(null); // { ids, at }
+// Said on the store, so the Derby's finish line waits for it to close (racing.js finishOpen).
+watch(shown, (moment) => (store.earnShowing = Boolean(moment)));
 const button = ref(null);
 watch(
   () => progress.lastBadges,
