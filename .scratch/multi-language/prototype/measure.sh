@@ -58,7 +58,7 @@ export PATH=$T/node/bin:$T/jdk/bin:$T/dotnet:$PATH JAVA_HOME=$T/jdk DOTNET_ROOT=
 
 learner_worker() {  # learner_worker DIR CMD...: the learner's own worker, on the hello queue, as in the worker terminal
   local dir=$1; shift
-  ( cd "$dir" && TASK_QUEUE=hello exec "$@" > $OUT/learner-worker-$(basename $(dirname $dir)).log 2>&1 ) &
+  ( cd "$dir" && HELLO_TASK_QUEUE=hello exec "$@" > $OUT/learner-worker-$(basename $(dirname $dir)).log 2>&1 ) &
   LEARNER=$!
   sleep 15
 }

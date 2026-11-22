@@ -8,7 +8,7 @@ using Temporalio.Worker;
 
 string Env(string name, string fallback) => Environment.GetEnvironmentVariable(name) ?? fallback;
 
-var taskQueue = Env("TASK_QUEUE", "hello");
+var taskQueue = Env("HELLO_TASK_QUEUE", "hello");
 var client = await TemporalClient.ConnectAsync(new(Env("TEMPORAL_ADDRESS", "localhost:7233"))
 {
     Namespace = Env("TEMPORAL_NAMESPACE", "default"),

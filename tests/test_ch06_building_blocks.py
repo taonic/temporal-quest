@@ -8,7 +8,6 @@ for a new card (F14), a new step that old holds survive (F12), and replaying a h
 import asyncio
 import uuid
 from contextlib import asynccontextmanager
-from pathlib import Path
 
 import pytest
 from temporalio.client import (
@@ -27,9 +26,8 @@ from hello.itinerary import ItineraryWorkflow
 from hello.replay import replay
 from hello.saga import BookTripWorkflow
 from hello.shared import Booking, HoldRequest, Itinerary, Payment
-from hello.worker import RUNNER, build_worker
-
-HISTORIES = Path(__file__).parent / "histories"
+from hello.worker import RUNNER
+from tests import langs
 
 
 @asynccontextmanager
@@ -40,8 +38,8 @@ async def running(env):
         namespace=env.client.namespace,
         data_converter=pydantic_data_converter,
     )
-    queue = f"blocks-{uuid.uuid4().hex[:8]}"
-    async with build_worker(client, queue):
+    queue = langs.queue("blocks")
+    async with langs.hello_worker(client, queue):
         yield client, queue
 
 
@@ -63,7 +61,7 @@ async def start_hold(client, queue, seat: str, seconds: float):
 
 
 def fixture(name: str) -> WorkflowHistory:
-    return WorkflowHistory.from_json(name, (HISTORIES / f"{name}.json").read_text())
+    return WorkflowHistory.from_json(name, langs.history(name).read_text())
 
 
 # --- F8: timers ----------------------------------------------------------------------------------
@@ -234,15 +232,20 @@ async def test_the_expired_card_is_turned_away(env):
 # --- F12: versioning -----------------------------------------------------------------------------
 
 
+STUCK_HOLD = "A hold that started before the email step no longer replays: it would get stuck."
+
+
 async def test_a_hold_from_before_the_email_still_replays():
+    if not langs.PYTHON:
+        outcome, output = langs.replay(langs.history("fare_hold_before_the_email"))
+        if outcome != "ok":
+            pytest.fail(f"{STUCK_HOLD} Guard the new step with a patch.\n{output}")
+        return
     replayer = Replayer(workflows=[FareHoldWorkflow], data_converter=pydantic_data_converter, workflow_runner=RUNNER)
     try:
         await replayer.replay_workflow(fixture("fare_hold_before_the_email"))
     except NondeterminismError as err:
-        pytest.fail(
-            "A hold that started before the email step no longer replays: it would get stuck. "
-            f"Guard the new step with workflow.patched(...) in hello/hold.py. ({err})"
-        )
+        pytest.fail(f"{STUCK_HOLD} Guard the new step with workflow.patched(...) in hello/hold.py. ({err})")
 
 
 async def test_a_new_hold_sends_the_email(env):
@@ -260,6 +263,10 @@ async def test_a_new_hold_sends_the_email(env):
 
 
 async def test_replay_passes_a_history_the_code_still_matches():
+    if not langs.PYTHON:
+        outcome, output = langs.replay(langs.history("fare_hold_before_the_email"))
+        assert outcome == "ok", f"The replay isn't written yet, or it fails a history that matches:\n{output}"
+        return
     try:
         await replay(fixture("fare_hold_before_the_email"))
     except NotImplementedError:
@@ -267,6 +274,10 @@ async def test_replay_passes_a_history_the_code_still_matches():
 
 
 async def test_replay_catches_a_history_the_code_no_longer_matches():
+    # A trip from an older version that waited a second before its lookups: today's doesn't.
+    if not langs.PYTHON:
+        outcome, output = langs.replay(langs.history("trip_that_waited_first"))
+        assert outcome == "nondeterminism", f"The replay should say this history no longer matches:\n{output}"
+        return
     with pytest.raises(NondeterminismError):
-        # A trip from an older version that waited a second before its lookups: today's doesn't.
         await replay(fixture("trip_that_waited_first"))

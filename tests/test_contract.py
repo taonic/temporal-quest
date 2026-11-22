@@ -1,9 +1,8 @@
 """The hello wire contract (hello/CONTRACT.md): every workflow, message and activity by its name,
 with plain JSON payloads, as a client in another language would send them.
 
-The worker is Python's for now. Ticket 06's adapter (tests/langs.py) runs each language's worker
-here instead, with its own activities: the module checks run Python's activities, so this test is
-what keeps every language's activities matching.
+The worker is the language's (QUEST_LANG, tests/langs.py), with its own activities: the module
+checks run Python's activities, so this test is what keeps every language's activities matching.
 """
 
 import asyncio
@@ -16,7 +15,7 @@ from temporalio.client import Client, WorkflowFailureError, WorkflowUpdateFailed
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.exceptions import ActivityError, ApplicationError
 
-from hello.worker import build_worker
+from tests import langs
 
 
 @pytest_asyncio.fixture
@@ -27,14 +26,14 @@ async def plain(env) -> Client:
 
 @contextlib.asynccontextmanager
 async def hello_worker(env):
-    """A hello worker on a queue of its own (Python's, until the adapter can run the others')."""
+    """A hello worker in the language under test, with its own activities."""
     client = await Client.connect(
         env.client.service_client.config.target_host,
         namespace=env.client.namespace,
         data_converter=pydantic_data_converter,
     )
-    queue = f"contract-{uuid.uuid4().hex[:8]}"
-    async with build_worker(client, queue):
+    queue = langs.queue("contract")
+    async with langs.hello_worker(client, queue, own_activities=True):
         yield queue
 
 

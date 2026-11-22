@@ -15,6 +15,15 @@ from temporalio.testing import WorkflowEnvironment  # noqa: E402
 from temporal_agent_harness.plugin import AgentHarnessPlugin  # noqa: E402
 
 
+@pytest.fixture(scope="session", autouse=True)
+def learner_workers():
+    """The workers the checks started in the learner's language (tests/langs.py), stopped at the end."""
+    yield
+    from tests import langs
+
+    langs.stop_all()
+
+
 @pytest_asyncio.fixture(scope="session")
 async def env():
     from concierge.service import NAMESPACE

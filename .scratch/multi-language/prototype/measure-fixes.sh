@@ -52,7 +52,7 @@ sleep 5
 check() { QUEST_LANG=$1 .venv/bin/python -m pytest -q -p no:cacheprovider --rootdir $W $PROTO/test_f2_split.py; }
 learner_worker() {
   local dir=$1; shift
-  ( cd "$dir" && TASK_QUEUE=hello exec "$@" > $OUT/learner-worker-$(basename $(dirname $dir)).log 2>&1 ) &
+  ( cd "$dir" && HELLO_TASK_QUEUE=hello exec "$@" > $OUT/learner-worker-$(basename $(dirname $dir)).log 2>&1 ) &
   LEARNER=$!; sleep 15
 }
 

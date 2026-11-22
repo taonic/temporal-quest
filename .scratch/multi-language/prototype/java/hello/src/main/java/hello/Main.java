@@ -23,7 +23,7 @@ public class Main {
         var client = WorkflowClient.newInstance(service, WorkflowClientOptions.newBuilder()
                 .setNamespace(env("TEMPORAL_NAMESPACE", "default"))
                 .build());
-        String taskQueue = env("TASK_QUEUE", "hello");
+        String taskQueue = env("HELLO_TASK_QUEUE", "hello");
         String command = args.length > 0 ? args[0] : "worker";
 
         if (command.equals("worker")) {

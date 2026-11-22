@@ -13,8 +13,8 @@ from temporalio.contrib.pydantic import pydantic_data_converter
 from hello import activities
 from hello.board import BoardingWorkflow
 from hello.shared import BoardingRequest, BoardingStatus, TripRequest
-from hello.worker import build_worker
 from hello.workflow import HelloTripWorkflow
+from tests import langs
 
 TODO_HINT = "Is TODO(ch01) in hello/workflow.py done? The workflow never finished."
 
@@ -25,9 +25,9 @@ async def _run(env, origin="SFO", destination="JFK") -> tuple[str, Client, str]:
         namespace=env.client.namespace,
         data_converter=pydantic_data_converter,
     )
-    queue = f"hello-{uuid.uuid4().hex[:8]}"
+    queue = langs.queue("hello")
     workflow_id = f"hello-test-{uuid.uuid4().hex[:8]}"
-    async with build_worker(client, queue):
+    async with langs.hello_worker(client, queue):
         handle = await client.start_workflow(
             HelloTripWorkflow.run, TripRequest(origin=origin, destination=destination), id=workflow_id, task_queue=queue
         )
@@ -83,11 +83,11 @@ async def test_boarding_counts_every_passenger_across_a_worker_restart(env):
         namespace=env.client.namespace,
         data_converter=pydantic_data_converter,
     )
-    queue = f"board-{uuid.uuid4().hex[:8]}"
+    queue = langs.queue("board")
     # The dev server fires timers about a second apart however short they are, so each
     # passenger costs a second: one boards before the restart and two after it.
     flight = BoardingRequest(origin="SFO", destination="JFK", seats=3, pace=0.5)
-    async with build_worker(client, queue):
+    async with langs.hello_worker(client, queue, fresh=True):
         handle = await client.start_workflow(
             BoardingWorkflow.run, flight, id=f"board-test-{uuid.uuid4().hex[:8]}", task_queue=queue
         )
@@ -95,7 +95,7 @@ async def test_boarding_counts_every_passenger_across_a_worker_restart(env):
             await asyncio.sleep(0.2)
     assert before.flight == "SFO→JFK" and before.seats == 3
     # A new worker knows nothing of the old one: it rebuilds the count from the history.
-    async with build_worker(client, queue):
+    async with langs.hello_worker(client, queue, fresh=True):
         after = await _boarded(handle)
         assert after.boarded >= before.boarded, f"boarding started over: {before.boarded} before, {after.boarded} after"
         result = await asyncio.wait_for(handle.result(), timeout=15)

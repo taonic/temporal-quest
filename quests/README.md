@@ -197,7 +197,7 @@ langs:
     tour: [ … ]
 ```
 
-**Its code** in a language other than Python lives under `langs/<language>/`, and its masters under `authoring/langs/<language>/`, with the same `// @@solution F2` markers. `./quest lang typescript` chooses the language locally (it's kept in `.course/lang`), and `./quest` then works on that language's files and runs the checks with `QUEST_LANG=typescript`. `scripts/verify_modules.py` checks each module in each of its branch's languages, and the site's build fails on a snippet, a `langs:` entry or a language block that a language is missing.
+**Its code** in a language other than Python lives under `langs/<language>/`, and its masters under `authoring/langs/<language>/`, with the same `// @@solution F2` markers. `./quest lang typescript` chooses the language locally (it's kept in `.course/lang`), and `./quest` then works on that language's files and runs the checks with `QUEST_LANG=typescript`. A check gets its worker from `tests/langs.py` (`langs.hello_worker(client, langs.queue("hello"))`): in Python, as always; in another language, the learner's workflows in a worker of that language's, kept for the whole check, beside the activities in Python. Its histories are in `tests/histories/<language>/` (`scripts/record_histories.py --lang typescript`). `scripts/verify_modules.py` checks each module in each of its branch's languages, and the site's build fails on a snippet, a `langs:` entry or a language block that a language is missing.
 
 ## TODOs and save points
 

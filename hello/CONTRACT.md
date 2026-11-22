@@ -13,6 +13,7 @@ Fundamentals runs in Python, TypeScript, Java and .NET. Every language's `hello`
   - `WORKER_MODE`: `all` (default), `workflows` or `activities`. The checks and challenges run the learner's workflows with Python's activities.
   - `TEMPORAL_ADDRESS` (`localhost:7233`) and `TEMPORAL_NAMESPACE` (`default`).
   - `FLAKY=1`: `lookup_airport` fails its first `FLAKY_FAILURES` attempts (default 4).
+- **Replay** (the other languages): a `replay --history FILE` command replays a history file on the workflow code, and exits 0 when it replays, 1 when the code no longer matches it (nondeterminism), and anything else for anything else, such as an open TODO. F12's and F13's checks run it. How each language runs its worker and its replay is in `tests/langs.py`.
 
 ## Payloads
 

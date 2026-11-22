@@ -77,7 +77,7 @@ async def worker(lang: Lang, client, queue: str, env: dict[str, str] | None = No
                  cwd: Path | None = None, mode: str = "all", timeout: float = 60):
     """The language's worker, polling `queue`, until the block ends."""
     proc_env = {**os.environ, "TEMPORAL_ADDRESS": client.service_client.config.target_host,
-                "TEMPORAL_NAMESPACE": client.namespace, "TASK_QUEUE": queue, "WORKER_MODE": mode, **dict(lang.env), **(env or {})}
+                "TEMPORAL_NAMESPACE": client.namespace, "HELLO_TASK_QUEUE": queue, "WORKER_MODE": mode, **dict(lang.env), **(env or {})}
     start = time.monotonic()
     proc = subprocess.Popen(lang.worker, cwd=cwd or lang.dir, env=proc_env, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT, text=True, start_new_session=True)
