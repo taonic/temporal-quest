@@ -13,7 +13,7 @@ import { computed } from "vue";
 import NodeGlyph from "./NodeGlyph.vue";
 import { medalSvg } from "../badgeArt.js";
 import { course } from "../store.js";
-import { STATE_LABEL, activePath, badges, branchesById, gatesOf, idOf, isDone, isEarned, isPlayable, modulesById, opensAfter, routeTo, stateOf, trunk, trunkTail } from "../progress.js";
+import { STATE_LABEL, activePath, badges, branchesById, conceptLine, conceptLit, gatesOf, idOf, isDone, isEarned, isPlayable, modulesById, opensAfter, routeTo, stateOf, trunk, trunkTail } from "../progress.js";
 
 const props = defineProps({
   selected: { type: String, default: null },
@@ -50,6 +50,13 @@ function wrap(text, chars, max) {
   return lines;
 }
 
+// A node's Temporal concepts: one quiet line under its title (progress.js conceptLine).
+const TAG_LINE = 12;
+const conceptLines = (id, chars) => {
+  const line = conceptLine(modulesById.get(id), chars);
+  return line ? [line] : [];
+};
+
 const layout = computed(() => {
   const nodes = new Map(); // id → { x, y, label: { x, y, anchor, lines } }
   const tierLabels = [];
@@ -58,27 +65,30 @@ const layout = computed(() => {
 
   // The trunk: tier I, then tier II back below it, the boss at its end. A trunk of one tier
   // (Essentials) wraps the same way: its first half, then the rest back below it.
-  const rowY = [104, 268];
   const oneTier = trunk.tiers.length < 2;
   const half = Math.ceil((trunkMods(1).length + (trunk.boss ? 1 : 0)) / 2);
   const tierOne = oneTier ? trunkMods(1).slice(0, half) : trunkMods(1);
+  // Each row's concept lines push what's below it down.
+  const tagRoom = (ids) => Math.max(0, ...ids.map((id) => conceptLines(id, 18).length)) * TAG_LINE;
+  const rowY = [104, 268 + tagRoom(tierOne)];
   const startX = W / 2 - ((tierOne.length - 1) * STEP) / 2;
   tierOne.forEach((id, i) => {
     const x = startX + i * STEP;
-    nodes.set(id, { x, y: rowY[0], label: { x, y: rowY[0] + 36, anchor: "middle", lines: [kicker(id), ...wrap(title(id), 16, 3)] } });
+    nodes.set(id, { x, y: rowY[0], label: { x, y: rowY[0] + 36, anchor: "middle", lines: [kicker(id), ...wrap(title(id), 16, 3)], tags: conceptLines(id, 18) } });
   });
   const rightX = startX + (tierOne.length - 1) * STEP;
   const tierTwo = [...(oneTier ? trunkMods(1).slice(half) : trunkMods(2)), ...(trunk.boss ? [trunk.boss] : [])];
   tierTwo.forEach((id, i) => {
     const x = rightX - i * STEP;
     const lines = [kicker(id), ...wrap(title(id), 16, id === trunk.boss ? 2 : 3)];
-    nodes.set(id, { x, y: rowY[1], label: { x, y: rowY[1] + (id === trunk.boss ? 40 : 36), anchor: "middle", lines } });
+    nodes.set(id, { x, y: rowY[1], label: { x, y: rowY[1] + (id === trunk.boss ? 40 : 36), anchor: "middle", lines, tags: conceptLines(id, 18) } });
   });
+  const tierTwoTags = tagRoom(tierTwo);
   tierLabels.push({ key: "trunk-1", x: startX - 26, y: rowY[0] - 40, text: `Tier I · ${trunk.tiers[0].name}`, badge: tierBadge(trunk.id, 1) });
   if (!oneTier) tierLabels.push({ key: "trunk-2", x: startX - 26, y: rowY[1] - 40, text: `Tier II · ${trunk.tiers[1].name}`, badge: tierBadge(trunk.id, 2) });
   // The turn from tier I's end down to tier II's start, outside both rows' labels.
   const turn = { from: tierOne.at(-1), to: tierTwo[0], x: rightX + 60 };
-  const trunkZone = { branch: trunk, x: 16, y: 12, w: W - 32, h: rowY[1] + 92 - 12 };
+  const trunkZone = { branch: trunk, x: 16, y: 12, w: W - 32, h: rowY[1] + 92 + tierTwoTags - 12 };
 
   // Where the branches open.
   const junction = { x: W / 2, y: trunkZone.y + trunkZone.h + 34 };
@@ -99,8 +109,9 @@ const layout = computed(() => {
       y += 30;
       for (const id of ids) {
         const lines = [kicker(id), ...wrap(title(id), 21, 3)];
-        nodes.set(id, { x: track, y, label: { x: track + 30, y: y - ((lines.length - 1) * LINE) / 2 + 4, anchor: "start", lines } });
-        y += Math.max(54, lines.length * LINE + 18);
+        const tags = conceptLines(id, 24);
+        nodes.set(id, { x: track, y, label: { x: track + 30, y: y - ((lines.length - 1) * LINE) / 2 + 4, anchor: "start", lines, tags } });
+        y += Math.max(54, lines.length * LINE + tags.length * TAG_LINE + 18);
       }
       y += 8;
     });
@@ -133,6 +144,8 @@ function roman(n) {
 
 const all = computed(() => [...layout.value.nodes.keys()].map((id) => modulesById.get(id)));
 const pathIndex = computed(() => new Map((activePath.value?.modules ?? []).map((id, i) => [id, i + 1])));
+// The concept picked on the map: the modules that teach it are lit (progress.js).
+const conceptNodes = computed(() => conceptLit.value);
 const tail = modulesById.get(trunkTail);
 
 // The limbs: from the junction to each branch that opens after the trunk.
@@ -240,7 +253,7 @@ const nodeLabel = (m) =>
       <g
         v-for="m in all"
         :key="m.id"
-        :class="['map-node', `is-${stateOf(m)}`, `branch-${branchesById.get(m.branch).color}`, { 'is-soon': !isPlayable(m), 'is-selected': selected === m.id, 'off-path': pathIndex.size && !pathIndex.has(m.id), 'off-route': offRoute(m.id) }]"
+        :class="['map-node', `is-${stateOf(m)}`, `branch-${branchesById.get(m.branch).color}`, { 'is-soon': !isPlayable(m), 'is-selected': selected === m.id, 'off-path': pathIndex.size && !pathIndex.has(m.id), 'off-route': offRoute(m.id), 'has-concept': conceptNodes?.has(m.id), 'off-concept': conceptNodes && !conceptNodes.has(m.id) }]"
         :data-module="m.id"
         :data-exercise="m.exercise || null"
         tabindex="0"
@@ -256,7 +269,7 @@ const nodeLabel = (m) =>
           class="map-node-hit"
           :x="layout.nodes.get(m.id).x - 24" :y="layout.nodes.get(m.id).y - 24" :width="COL_W - 30" height="48" rx="12"
         />
-        <rect v-else class="map-node-hit" :x="layout.nodes.get(m.id).x - STEP / 2 + 4" :y="layout.nodes.get(m.id).y - 26" :width="STEP - 8" height="98" rx="12" />
+        <rect v-else class="map-node-hit" :x="layout.nodes.get(m.id).x - STEP / 2 + 4" :y="layout.nodes.get(m.id).y - 26" :width="STEP - 8" :height="98 + (layout.nodes.get(m.id).label.tags?.length ?? 0) * TAG_LINE" rx="12" />
         <NodeGlyph
           :kind="m.kind"
           :state="stateOf(m)"
@@ -275,6 +288,13 @@ const nodeLabel = (m) =>
             :dy="i ? LINE : 0"
             :class="{ 'map-label-id': i === 0, 'is-kind': i === 0 && m.kind !== 'module' }"
           >{{ line }}</tspan>
+          <tspan
+            v-for="(tag, i) in layout.nodes.get(m.id).label.tags ?? []"
+            :key="`tag-${i}`"
+            class="map-label-concept"
+            :x="layout.nodes.get(m.id).label.x"
+            :dy="i ? TAG_LINE : LINE + 2"
+          >{{ tag }}</tspan>
         </text>
         <g v-if="pathIndex.has(m.id)" class="map-path-badge">
           <circle :cx="layout.nodes.get(m.id).x + 16" :cy="layout.nodes.get(m.id).y - 16" r="9" />

@@ -3,6 +3,7 @@ id: F13
 title: Catch a breaking change before it ships
 teaser: "Replay real histories against your new code, and find the change that would break a running workflow on your machine."
 learn: "Replay testing: catching a non-deterministic change before it reaches a running workflow."
+concepts: [replay-testing, determinism]
 minutes: 6
 xp: 10
 tier: 2
@@ -25,9 +26,9 @@ questions:
   - How does the time-skipping test environment work?
 ---
 
-## 8. Replay it first
+## 12. Replay it first
 
-Step 6 found its break the hard way: on a running hold. A **replayer** finds it first. It's a worker with no server: give it a history and your code, and it replays one over the other, and fails if they no longer agree. Open `hello/replay.py`, and replace its `TODO(ch06)` with:
+Step 10 found its break the hard way: on a running hold. A **replayer** finds it first. It's a worker with no server: give it a history and your code, and it fails if they no longer agree. In `hello/replay.py`, replace the `TODO(ch06)` with:
 
 ```python hello/replay.py
 # A replayer is a worker with no server: it runs the workflow code over a history, and
@@ -36,7 +37,7 @@ replayer = Replayer(workflows=WORKFLOWS, data_converter=pydantic_data_converter,
 await replayer.replay_workflow(history)
 ```
 
-`hello-replay` fetches a workflow's history from Temporal and replays it on the code in your editor, with no worker restart. Replay the two holds from the last module: 14C, which started before the email, and 15A, which sent one. (No 15A? `uv run hello-hold 15A 5` makes one.)
+`hello-replay` fetches a workflow's history from Temporal and replays it on the code in your editor, with no worker restart. Replay the two holds from the last module: 14C, from before the email, and 15A, which sent one. (No 15A? `uv run hello-hold 15A 5` makes one.)
 
 ```bash
 uv run hello-replay hold-14c
@@ -45,9 +46,17 @@ uv run hello-replay hold-15a
 
 Both: `✓ … replays on this code`.
 
-Now a teammate's change: emails are moving to another service, so they delete the email step from `hello/hold.py`, `if` and all. Delete it, save, and don't restart the worker. Replay both again. 14C still replays: it never sent an email. 15A doesn't: `✗ hold-15a-… doesn't replay on this code`. Every hold that sent the email would get stuck the moment it was replayed, and you found out on your machine, before shipping. Put the step back (undo, or **Revert** on step 7's snippet).
+## 13. Catch a teammate's change
 
-In CI, it's the same thing with saved histories: `tests/histories/` keeps two as JSON, and `tests/test_ch06_building_blocks.py` replays them, one that must pass and one that must fail. For workflows that wait days, `WorkflowEnvironment.start_time_skipping()` runs their tests with the timers skipped, in seconds.
+A teammate is moving emails to another service, so they delete the email step from `hello/hold.py`, `if` and all.
+
+- Delete it, save, and don't restart the worker.
+- Replay both again: `uv run hello-replay hold-14c`, then `uv run hello-replay hold-15a`. 14C still replays: it never sent an email. 15A doesn't: `✗ hold-15a-… doesn't replay on this code`.
+- Put the step back (undo, or **Revert** on step 11's snippet).
+
+Every hold that sent the email would get stuck the moment it was replayed, and you found out on your machine, before shipping.
+
+In CI, it's the same with saved histories: `tests/histories/` keeps two as JSON, and `tests/test_ch06_building_blocks.py` replays them, one that must pass and one that must fail. For workflows that wait days, `WorkflowEnvironment.start_time_skipping()` runs their tests with the timers skipped.
 
 ## Check
 

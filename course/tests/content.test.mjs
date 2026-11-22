@@ -52,6 +52,19 @@ test("the built course covers every exercise in both modes", () => {
   }
 });
 
+test("an update link is a button that fills in Send an Update, and words locally", () => {
+  const blocks = buildCourse().exercises.find((e) => e.modules.includes("F14"));
+  const browser = blocks.modes.browser.sections.map((s) => s.html).join("\n");
+  assert.match(
+    browser,
+    /<button class="workflow-link" type="button" data-workflow-open="book-sfo-jfk-" data-workflow-update="new_card" data-update-input="\{&quot;card&quot;:&quot;1111&quot;\}"[^>]*>Send it the same card<\/button>/,
+  );
+  assert.match(browser, /data-workflow-update="new_card" data-update-input="\{&quot;card&quot;:&quot;4242&quot;\}"/);
+  const local = blocks.modes.local.sections.map((s) => s.html).join("\n");
+  assert.ok(!local.includes("data-workflow-update"), "no update buttons locally");
+  assert.match(local, /<strong>More Actions<\/strong>, then <strong>Send an Update<\/strong>/);
+});
+
 test("in the browser, localhost links open panes and command snippets get a run button", () => {
   const hello = buildCourse().exercises[0];
   const html = hello.modes.browser.sections.map((s) => s.html).join("\n");
@@ -120,7 +133,7 @@ test("the quests: every module where its branch says, and every module it builds
   const trunk = course.paths.find((p) => p.id === "fundamentals");
   assert.deepEqual(trunk.modules, course.branches.find((b) => b.id === "fundamentals").modules);
   for (const id of trunk.modules) assert.equal(course.modules.find((m) => m.id === id).status, "ready", `${id} isn't ready`);
-  assert.deepEqual(course.exercises[5].modules, ["F8", "F9", "F10", "F11", "F12", "FC3", "F13"]);
+  assert.deepEqual(course.exercises[5].modules, ["F8", "F9", "F10", "F11", "F14", "F12", "FC3", "F13"]);
 });
 
 test("every exercise's TODO block is in its starter, and its snippet replaces it", async () => {
@@ -156,7 +169,7 @@ test("in the browser, every mention of stopping or starting the worker gets the 
   const html = hello.modes.browser.sections.map((s) => s.html).join("\n");
   const toggles = html.match(/data-worker-toggle/g) ?? [];
   assert.ok(toggles.length >= 5, `only ${toggles.length} toggles`);
-  assert.match(html, /stop the worker \(Ctrl-C\)<button class="worker-toggle"/);
+  assert.match(html, /[Ss]top the worker \(Ctrl-C\)<button class="worker-toggle"/);
   assert.doesNotMatch(html, /<h2>[^<]*<button class="worker-toggle"/);
   const local = hello.modes.local.sections.map((s) => s.html).join("\n");
   assert.ok(!local.includes("data-worker-toggle"), "local pages have no toggles");
@@ -178,7 +191,7 @@ test("after \"restart the worker\" comes a restart button, except with something
   const session = exercises[1].modes.browser.sections.map((s) => s.html).join("\n");
   assert.match(session, /Restart the worker<button class="worker-toggle" type="button" data-worker-toggle data-worker-restart>/);
   assert.match(hello, /Restart the worker<button class="worker-toggle" type="button" data-worker-toggle>[\s\S]*? with <code/);
-  assert.match(hello, /stop the worker \(Ctrl-C\)<button class="worker-toggle" type="button" data-worker-toggle>/);
+  assert.match(hello, /[Ss]top the worker \(Ctrl-C\)<button class="worker-toggle" type="button" data-worker-toggle>/);
 });
 
 test("in the browser, every new session the instructions ask for is a button with its posture", () => {
@@ -349,7 +362,7 @@ test("each persona sees its own branches, paths and badges, and what it sees bui
   assert.deepEqual(course.paths.find((p) => p.id === "agent-governance-4h").personas, ["developer"]);
   const skills = (persona) => course.badges.filter((b) => b.kind === "skill" && b.personas.includes(persona)).map((b) => b.id);
   assert.deepEqual(skills("essentials"), ["clean-run", "flawless", "logbook-keeper", "fix-forward", "storm-rider", "night-owl", "crash-proof", "time-keeper", "signed-off", "clean-undo"]);
-  assert.deepEqual(skills("developer"), ["clean-run", "no-peeking", "flawless", "explorer", "cross-team"]);
+  assert.deepEqual(skills("developer"), ["clean-run", "no-peeking", "flawless", "explorer", "cross-team", "first-run", "history-reader", "retry-wrangler", "count-keeper", "seat-holder", "trip-planner", "second-chance", "safe-shipper", "session-starter", "tool-fixer", "code-mode", "approver", "light-touch", "patient-gate", "time-traveler", "good-neighbor", "steady-partner"]);
   const essentials = course.exercises.find((e) => e.id === "07-essentials");
   assert.equal(essentials.layout, "board");
   assert.deepEqual(essentials.personas, ["essentials"]);
@@ -432,7 +445,34 @@ test("a branch with maxWords keeps each guide message that short, counting the w
   const page = (words) => ({ intro: "<p>Hi.</p>", sections: [{ title: "Run a trip", html: `<p>${"word ".repeat(words)}</p>` }] });
   assert.doesNotThrow(() => checkWords(page(100), 100, "here"));
   assert.throws(() => checkWords(page(101), 100, "here"), /"Run a trip" is 101 words; its branch keeps each message to 100/);
+  // Code isn't prose: a snippet or a code block doesn't count.
+  const code = `<div class="snippet"><div class="snippet-actions"></div><pre><code>${"x ".repeat(300)}</code></pre></div><pre>${"y ".repeat(300)}</pre>`;
+  assert.doesNotThrow(() => checkWords({ intro: "", sections: [{ title: "Code", html: `<p>${"word ".repeat(100)}</p>${code}` }] }, 100, "here"));
   // Essentials' own messages are all within it.
   const essentials = build().exercises.find((e) => e.id === "07-essentials").modes.browser;
   assert.ok([essentials.intro, ...essentials.sections.map((s) => s.html)].every((html) => wordsIn(html) <= 100));
+  // Fundamentals keeps each step to 150 (build() would throw otherwise).
+  assert.equal(build().branches.find((b) => b.id === "fundamentals").maxWords, 150);
+});
+
+test("concepts: each module's are in quests/concepts.yaml, and its code can't use one it doesn't list", async () => {
+  const { checkConcepts, loadConcepts } = await import("../content/build.mjs");
+  const concepts = loadConcepts();
+  const branch = { id: "b", modules: ["X1"] };
+  const module = (over) => new Map([["X1", { id: "X1", kind: "module", status: "ready", source: "x/module.md", body: "", ...over }]]);
+  assert.throws(() => checkConcepts([branch], module({ concepts: ["telepathy"] }), concepts), /concept telepathy isn't in quests\/concepts.yaml/);
+  const code = "```python x.py\n@workflow.update\ndef pay(self): ...\n```";
+  assert.throws(() => checkConcepts([branch], module({ concepts: ["query"], body: code }), concepts), /uses Update .* don't list update/);
+  assert.doesNotThrow(() => checkConcepts([branch], module({ concepts: ["update"], body: code }), concepts));
+  // Incidental calls don't count: an activity call is in nearly every module.
+  assert.doesNotThrow(() => checkConcepts([branch], module({ concepts: ["saga"], body: "```python\nawait workflow.execute_activity(a, b, start_to_close_timeout=t)\n```" }), concepts));
+  // In a branch that tags its modules, every ready one is tagged.
+  const two = new Map([...module({ concepts: ["saga"] }), ["X2", { id: "X2", kind: "module", status: "ready", source: "y/module.md", body: "" }]]);
+  assert.throws(() => checkConcepts([{ id: "b", modules: ["X1", "X2"] }], two, concepts), /y\/module.md: no concepts/);
+
+  const course = buildCourse();
+  const fundamentals = course.modules.filter((m) => m.branch === "fundamentals" && m.kind === "module");
+  assert.ok(fundamentals.every((m) => m.concepts?.length), "every Fundamentals module lists its concepts");
+  assert.deepEqual(course.concepts.find((c) => c.id === "update").modules, ["F9", "F14"]);
+  assert.deepEqual(course.concepts.find((c) => c.id === "signal").modules, [], "not in the course yet");
 });

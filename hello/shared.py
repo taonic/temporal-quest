@@ -54,3 +54,9 @@ class Booking(BaseModel):
     origin: str
     destination: str
     card: str
+
+
+class BookingStatus(BaseModel):
+    # The card it charges, and whether it's waiting for a new one because that card has expired.
+    card: str
+    waiting_for_new_card: bool

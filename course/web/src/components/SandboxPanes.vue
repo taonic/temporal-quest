@@ -67,6 +67,8 @@ function onMessage(event) {
   } else if (data?.__course === "navok") {
     clearTimeout(navFallback);
     pending = null;
+  } else if (data?.__course === "updatefail") {
+    toast(`Couldn't open Send an Update: use More Actions, Send an Update, ${data.name}.`);
   } else if (data?.__course === "navfail") {
     clearTimeout(navFallback);
     temporalSrc.value = `${origin.value}${data.path}`;

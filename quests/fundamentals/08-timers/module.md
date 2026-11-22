@@ -3,6 +3,7 @@ id: F8
 title: Hold a seat with a durable timer
 teaser: Hold a seat for 20 seconds, stop the worker, and watch the hold run out on time anyway.
 learn: "Durable timers: a wait that keeps time even while no worker is running."
+concepts: [timer, wait-condition]
 minutes: 6
 xp: 10
 tier: 2
@@ -45,7 +46,7 @@ Fundamentals' first tier was one idea: the history is the program's memory. This
 
 - a **fare hold** that keeps a seat for a while: a durable timer, then a message to pay for it;
 - an **itinerary** of several legs, each its own workflow;
-- a **booking** that undoes itself when the card is declined;
+- a **booking** that undoes itself when the card is declined, and waits for a new card when it's expired;
 - and two that every team needs sooner or later: **changing workflow code** while it's running, and **checking a change** before it ships.
 
 Everything runs on the worker you know, `uv run hello-worker`, and each module adds a command to talk to it.

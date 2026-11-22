@@ -3,6 +3,7 @@ id: F5
 title: Break it on purpose
 teaser: Make the activity flaky, and watch the retry policy get it through, with no retry loop of yours.
 learn: "Retry policies: Temporal retries a failing activity for you, so you write no retry loop."
+concepts: [retry-policy]
 minutes: 5
 xp: 10
 tier: 1

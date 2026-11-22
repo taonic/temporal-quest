@@ -3,6 +3,7 @@ id: F11
 title: Undo a booking with a saga
 teaser: "Book a flight and a hotel, have the card declined, and undo what already happened, newest first."
 learn: "Sagas: undoing the steps that already happened, newest first, when a later one fails."
+concepts: [saga, non-retryable]
 minutes: 6
 xp: 10
 tier: 2
@@ -27,15 +28,15 @@ questions:
 
 ## 5. Undo a booking
 
-Booking a trip is three calls to three companies: reserve a flight, reserve a hotel, charge the card. There's no transaction across an airline, a hotel and a bank, so if the card is declined, the flight and the hotel are already reserved. A **saga** undoes them: each step that succeeds adds the step that undoes it, and on a failure the saga runs those, newest first.
+Booking a trip is three calls: reserve a flight, reserve a hotel, charge the card. No transaction spans three companies, so if the card is declined, the flight and hotel stay reserved. A **saga** undoes them, newest first.
 
-Open `hello/saga.py`. The steps, and the list of undos, are written. What happens on a failure isn't: book with a card that's always declined, `0000`:
+In `hello/saga.py`, the steps and their undos are written. Book with `0000`, a declined card:
 
 ```bash
 uv run hello-book SFO JFK 0000
 ```
 
-It fails: `card ending 0000 was declined`. The worker's log shows `Reserved flight FL-SFOJFK` and `Reserved hotel HT-JFK`, and nothing undoes them. The traveller is holding a flight and a hotel they never paid for. `charge_card` raised a **non-retryable** error, so the retry policy didn't try it again: retrying won't change the bank's mind.
+It fails, and the worker's log shows the flight and hotel reserved, and nothing undone. `charge_card` raised a **non-retryable** error: a retry won't change the bank's mind.
 
 Replace the `TODO(ch06)` in `hello/saga.py` with:
 
@@ -47,8 +48,7 @@ for compensate, reservation in undo:
 raise
 ```
 
-Restart the worker, and book with the declined card again: `uv run hello-book SFO JFK 0000`. It still fails, but now the log shows `Cancelled hotel HT-JFK`, then `Cancelled flight FL-SFOJFK`, and <!-- browser
-[its Event History](#workflow/book-sfo-jfk/history)
---><!-- local -->its **Event History**<!-- /local --> shows the five activities in order. With a good card, `uv run hello-book SFO JFK 4242`, there's nothing to undo.
+- Restart the worker, and book with `0000` again: `uv run hello-book SFO JFK 0000`. It still fails, but the log shows `Cancelled hotel HT-JFK`, then `Cancelled flight FL-SFOJFK`.
+- Book with a good card, `uv run hello-book SFO JFK 4242`: nothing to undo.
 
-The undos are activities, so Temporal retries them and keeps the list in the history: a worker that dies halfway through undoing picks up where it stopped.
+The undos are activities too, so they're retried and recorded: a worker that dies mid-undo resumes.

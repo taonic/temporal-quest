@@ -84,6 +84,14 @@ function sendBuffered(req, res, status, headers, entry) {
 // course, and the side nav collapsed, since the pane is narrower than a browser window. They're
 // the UI's persisted stores (2.50: "dark mode" is "system", true or false; "navOpen" a boolean,
 // both JSON), so the learner can still change them; the next full load sets them again.
+//
+// Given an update ({name, input}) with the workflow, it opens Send an Update there (More
+// Actions, then Send an Update), picks the name, types the input as JSON, and focuses Submit,
+// for the learner to press: it never submits. The name picker lists the workflow's Updates once
+// its metadata query answers; with no worker to answer, there's only a name box, and an Update
+// the picker doesn't list goes in as Custom. The Data box is CodeMirror, which takes
+// execCommand('insertText') as typing (2.50.1). It answers updateready, or updatefail if the
+// dialog never came.
 const UI_PREFERENCES = { "dark mode": true, navOpen: false };
 const UI_LOADER = `<script>try{${Object.entries(UI_PREFERENCES)
   .map(([key, value]) => `localStorage.setItem(${JSON.stringify(key)},${JSON.stringify(JSON.stringify(value))});`)
@@ -123,9 +131,27 @@ function box(n){return document.querySelector('input[type=checkbox][data-track-t
 function pick(left){if(mine!==navs){btn.click();return;}cats.forEach(function(c){var b=box(LABELS[c]||c);if(b&&!b.checked)b.click();});
 setTimeout(function(){var ok=cats.every(function(c){var b=box(LABELS[c]||c);return b&&b.checked;});if(!ok&&left>0)pick(left-1);else btn.click();},250);}
 btn.click();setTimeout(function(){var none=box('None');if(none)none.click();setTimeout(function(){pick(4);},250);},300);}
+function fillUpdate(u,to,mine){var ticks=0,lastMore=-99,inDialog=0,custom=false;
+function vis(e){return!!e&&e.offsetParent!==null;}
+function byText(sel,text,root){return[].slice.call((root||document).querySelectorAll(sel)).filter(function(e){return e.textContent.trim()===text&&vis(e);})[0];}
+function type(el,text){el.focus();document.execCommand('selectAll');document.execCommand('insertText',false,text);}
+function option(d,text){return[].slice.call(d.querySelectorAll('[role=option]')).filter(function(o){return o.textContent.trim()===text;})[0];}
+function step(){if(mine!==navs)return;if(++ticks>100){reply({__course:'updatefail',name:u.name});return;}
+if(location.pathname!==to){setTimeout(step,250);return;}
+var d=[].slice.call(document.querySelectorAll('dialog[open],[role=dialog]')).filter(function(x){return!!x.querySelector('.cm-content');})[0];
+if(!d){var item=byText('[role=menuitem],li,button','Send an Update');
+if(item)item.click();else if(ticks-lastMore>=4){var more=byText('button','More Actions');if(more){more.click();lastMore=ticks;}}
+setTimeout(step,250);return;}
+inDialog++;var pick=option(d,u.name),box=d.querySelector('input#update-name');
+if(!pick&&!(vis(box)&&(inDialog>=8||custom))){if(inDialog>=8&&!custom){var c=option(d,'Custom');if(c){c.click();custom=true;}}setTimeout(step,250);return;}
+if(pick)pick.click();else type(box,u.name);
+type(d.querySelector('.cm-content'),JSON.stringify(u.input||{}));
+var submit=byText('button','Submit',d);if(submit)submit.focus();reply({__course:'updateready',name:u.name});}
+step();}
 window.addEventListener('message',function(e){var d=e.data;if(!d||d.__course!=='nav')return;var mine=++navs;
 if(d.workflow){var wf='/namespaces/default/workflows/'+encodeURIComponent(d.workflow);var tab=d.tab||'history';var view=tab==='compact';if(view)tab='history';
-fetch('/api/v1'+wf).then(function(r){return r.json();}).then(function(j){if(mine!==navs)return;go(wf+'/'+j.workflowExecutionInfo.execution.runId+'/'+tab);
+fetch('/api/v1'+wf).then(function(r){return r.json();}).then(function(j){if(mine!==navs)return;var to=wf+'/'+j.workflowExecutionInfo.execution.runId+'/'+tab;
+if(d.update){if(location.pathname!==to)go(to);else reply({__course:'navok',path:to});fillUpdate(d.update,to,mine);return;}go(to);
 var m=tab.match(/^history\\?category=([\\w,-]+)/);if(m)setTimeout(function(){filterTo(m[1].split(','),0,mine);},300);if(view)setTimeout(function(){compact(0,mine);},300);})
 .catch(function(){reply({__course:'navfail',path:wf});});return;}
 if(d.path)go(d.path);});})();</script>`;

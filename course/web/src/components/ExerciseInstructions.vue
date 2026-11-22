@@ -52,6 +52,7 @@ import { findSnippet } from "../snippets.js";
 import { streamIn } from "../streaming.js";
 import AskSetupCard from "./AskSetupCard.vue";
 import ChallengeCard from "./ChallengeCard.vue";
+import ConceptChips from "./ConceptChips.vue";
 import ModuleCheck from "./ModuleCheck.vue";
 import QuestionCard from "./QuestionCard.vue";
 
@@ -170,6 +171,8 @@ function goTo(index) {
 // The module the beat on show belongs to. A link to a module (#/module/A4) opens the guide at
 // its first beat (after getting started, the first time); the URL follows the module you're in.
 const currentModule = computed(() => moduleOfBeat(props.exercise, beat.value?.id));
+// The Temporal concepts its module teaches, as chips on each of its steps.
+const beatConcepts = computed(() => (beat.value?.kind === "step" ? modulesById.get(currentModule.value)?.concepts ?? [] : []));
 // The way on from this exercise: the module after its last, on the path or in its branch.
 const next = computed(() => nextModule(props.exercise.modules.at(-1)));
 let pendingModule = null;
@@ -797,7 +800,10 @@ function onClick(event) {
     openBoardTrip(target.dataset.workflowTab);
   } else if (target.matches("button[data-workflow-open]")) {
     if (!props.live) return toast("Start your sandbox to open it.");
-    openWorkflow(target.dataset.workflowOpen, target.dataset.workflowTab);
+    const update = target.dataset.workflowUpdate
+      ? { name: target.dataset.workflowUpdate, input: JSON.parse(target.dataset.updateInput || "{}") }
+      : null;
+    openWorkflow(target.dataset.workflowOpen, target.dataset.workflowTab, update);
   } else if (target.matches("button[data-trip-act]")) {
     const key = target.closest("[data-trip]").dataset.trip;
     if (target.dataset.tripAct === "open") openTrip(key);
@@ -917,6 +923,7 @@ function onClick(event) {
           <p class="guide-lead">{{ lead }}</p>
           <p class="guide-kicker">{{ kicker }}<template v-if="beat.kind === 'intro' && exercise.minutes"> · ~{{ exercise.minutes }} min</template></p>
           <h2 class="guide-title">{{ heading }}</h2>
+          <ConceptChips v-if="beatConcepts.length" :key="`concepts-${beat.id}`" :ids="beatConcepts" />
           <p v-if="beat.kind === 'intro' && exercise.teaser" class="exercise-meta">{{ exercise.teaser }}</p>
           <div class="guide-body markdown" :class="{ 'diagram-on-left': diagramOnLeft }" v-html="beat.html" />
           <AskSetupCard v-if="beat.id === 'start-ask'" class="guide-body" />

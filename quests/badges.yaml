@@ -4,7 +4,7 @@
 #   no-peeking  every module and challenge in a branch passed without the solution
 #   flawless    a boss beaten without losing a heart
 #   explorer    a module passed in every branch
-#   pass        the module named by `module`
+#   pass        the module named by `module`, or every one of a milestone's `modules`
 # `personas`: who sees it (none: everyone). Essentials has one branch and no solutions, so No
 # Peeking, Explorer and Cross-Team are the Developer persona's.
 # Tier badges are named in each branch.md, under its tier; boss badges are its classTitle.
@@ -94,3 +94,125 @@
   rule: pass
   module: E8
   criteria: Undo a declined trip cleanly, newest first
+
+# Developer milestones: a badge every two or three steps of a branch, between its tier badges.
+# Each is earned with all of its `modules`.
+- id: first-run
+  personas: [developer]
+  name: First Run
+  icon: play
+  rule: pass
+  modules: [F1, F2]
+  criteria: "Pass F1 and F2: run a workflow, and give it its first activity"
+- id: history-reader
+  personas: [developer]
+  name: History Reader
+  icon: logbook
+  rule: pass
+  modules: [F3, F4]
+  criteria: "Pass F3 and F4: finish a stuck workflow, and read what its history remembers"
+- id: retry-wrangler
+  personas: [developer]
+  name: Retry Wrangler
+  icon: umbrella
+  rule: pass
+  modules: [F5, FC1]
+  criteria: "Pass F5 and FC1: let a retry policy carry a flaky activity through a bad minute"
+- id: count-keeper
+  personas: [developer]
+  name: Count Keeper
+  icon: plug
+  rule: pass
+  modules: [F6, F7]
+  criteria: "Pass F6 and F7: leave work waiting with no worker, and keep a count through a restart"
+- id: seat-holder
+  personas: [developer]
+  name: Seat Holder
+  icon: hourglass
+  rule: pass
+  modules: [F8, F9]
+  criteria: "Pass F8 and F9: hold a seat with a durable timer, and pay for it with an Update"
+- id: trip-planner
+  personas: [developer]
+  name: Trip Planner
+  icon: undo
+  rule: pass
+  modules: [F10, F11]
+  criteria: "Pass F10 and F11: split a trip into child workflows, and undo a booking with a saga"
+- id: second-chance
+  personas: [developer]
+  name: Second Chance
+  icon: card
+  rule: pass
+  modules: [F14]
+  criteria: "Pass F14: wait for a new card instead of undoing the trip"
+- id: safe-shipper
+  personas: [developer]
+  name: Safe Shipper
+  icon: shield
+  rule: pass
+  modules: [F12, FC3]
+  criteria: "Pass F12 and FC3: ship a new step without breaking a running workflow"
+- id: session-starter
+  personas: [developer]
+  name: Session Starter
+  icon: chat
+  rule: pass
+  modules: [A2, A3]
+  criteria: "Pass A2 and A3: meet the agent, and start a durable session"
+- id: tool-fixer
+  personas: [developer]
+  name: Tool Fixer
+  icon: wrench
+  rule: pass
+  modules: [A4, A5]
+  criteria: "Pass A4 and A5: fix a broken tool while the session waits, and look inside it"
+- id: code-mode
+  personas: [developer]
+  name: Code Mode
+  icon: brackets
+  rule: pass
+  modules: [A1]
+  criteria: "Pass A1: run a model's script in the Monty sandbox"
+- id: approver
+  personas: [developer]
+  name: Approver
+  icon: stamp
+  rule: pass
+  modules: [A7, A8]
+  criteria: "Pass A7 and A8: notice what the agent did unasked, and make it ask first"
+- id: light-touch
+  personas: [developer]
+  name: Light Touch
+  icon: eye
+  rule: pass
+  modules: [A9, A10]
+  criteria: "Pass A9 and A10: ask only about what matters, and approve one, reject one"
+- id: patient-gate
+  personas: [developer]
+  name: Patient Gate
+  icon: moon
+  rule: pass
+  modules: [A11, A12]
+  criteria: "Pass A11 and A12: wait as long as it takes, and read the policy"
+- id: time-traveler
+  personas: [developer]
+  name: Time Traveler
+  icon: clock
+  rule: pass
+  modules: [A13, A14]
+  criteria: "Pass A13 and A14: try the plain rule, and look back in time"
+- id: good-neighbor
+  personas: [developer]
+  name: Good Neighbor
+  icon: mail
+  rule: pass
+  modules: [N1, N2]
+  criteria: "Pass N1 and N2: meet the other team, and call their agent"
+- id: steady-partner
+  personas: [developer]
+  name: Steady Partner
+  icon: anchor
+  rule: pass
+  modules: [N3, N4]
+  criteria: "Pass N3 and N4: call their workflow, and wait out their outage"

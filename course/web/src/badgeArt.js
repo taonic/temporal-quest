@@ -105,6 +105,33 @@ const ICONS = {
     <path d="M12 12 H25 A10 10 0 0 1 25 32 H11" fill="none" stroke="${ink}" stroke-width="4.6" stroke-linecap="round"/>
     <path d="M12 12 H25 A10 10 0 0 1 25 32 H11" fill="none" stroke="${tint}" stroke-width="1.6" stroke-linecap="round"/>
     <path d="M15 4 L5 12 L15 20 Z" fill="${ink}" stroke="${ink}" stroke-width="2" stroke-linejoin="round"/>`,
+  // Milestone badges (quests/badges.yaml): one every two or three steps of a developer branch.
+  play: (ink, tint) => `
+    <circle cx="20" cy="20" r="16" fill="${tint}" stroke="${ink}" stroke-width="2.4"/>
+    <path d="M16 12.5 L28 20 L16 27.5 Z" fill="${ink}" stroke="${ink}" stroke-width="2" stroke-linejoin="round"/>`,
+  chat: (ink, tint) => `
+    <path d="M6 7 H34 A2 2 0 0 1 36 9 V25 A2 2 0 0 1 34 27 H17 L10 34 V27 H6 A2 2 0 0 1 4 25 V9 A2 2 0 0 1 6 7 Z" fill="${tint}" stroke="${ink}" stroke-width="2.4" stroke-linejoin="round"/>
+    <circle cx="13" cy="17" r="2" fill="${ink}"/><circle cx="20" cy="17" r="2" fill="${ink}"/><circle cx="27" cy="17" r="2" fill="${ink}"/>`,
+  brackets: (ink, tint) => `
+    <rect x="4" y="7" width="32" height="26" rx="4" fill="${tint}" stroke="${ink}" stroke-width="2.4"/>
+    <path d="M15 14 L9 20 L15 26 M25 14 L31 20 L25 26" fill="none" stroke="${ink}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M22 13 L18 27" stroke="${ink}" stroke-width="2.4" stroke-linecap="round"/>`,
+  eye: (ink, tint) => `
+    <path d="M3 20 C9 10 31 10 37 20 C31 30 9 30 3 20 Z" fill="${tint}" stroke="${ink}" stroke-width="2.4" stroke-linejoin="round"/>
+    <circle cx="20" cy="20" r="6" fill="var(--paper)" stroke="${ink}" stroke-width="2.2"/>
+    <circle cx="20" cy="20" r="2.8" fill="${ink}"/>`,
+  clock: (ink, tint) => `
+    <circle cx="21" cy="22" r="14" fill="${tint}" stroke="${ink}" stroke-width="2.4"/>
+    <path d="M21 14 V22 L26.5 25.5" fill="none" stroke="${ink}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M3 8 L8 13 L13 8" fill="none" stroke="${ink}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`,
+  mail: (ink, tint) => `
+    <rect x="4" y="9" width="32" height="22" rx="3" fill="${tint}" stroke="${ink}" stroke-width="2.4"/>
+    <path d="M5 11 L20 22 L35 11" fill="none" stroke="${ink}" stroke-width="2.4" stroke-linejoin="round"/>`,
+  anchor: (ink, tint) => `
+    <circle cx="20" cy="8" r="4" fill="${tint}" stroke="${ink}" stroke-width="2.4"/>
+    <path d="M20 12 V35 M13 18 H27" stroke="${ink}" stroke-width="2.6" stroke-linecap="round"/>
+    <path d="M7 23 C8 31 14 35 20 35 C26 35 32 31 33 23" fill="none" stroke="${ink}" stroke-width="2.6" stroke-linecap="round"/>
+    <path d="M4 26 L7 22 L11 25 M36 26 L33 22 L29 25" fill="none" stroke="${ink}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`,
   link: (ink) => `
     <g transform="rotate(-45 20 20)">
       <rect x="2" y="13" width="20" height="14" rx="7" fill="none" stroke="${ink}" stroke-width="3.2"/>

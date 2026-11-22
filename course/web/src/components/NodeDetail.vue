@@ -5,6 +5,7 @@
 // ahead offered as the rule says (recommended, not required).
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 
+import ConceptChips from "./ConceptChips.vue";
 import NodeGlyph from "./NodeGlyph.vue";
 import {
   STATE_LABEL,
@@ -103,6 +104,10 @@ onBeforeUnmount(() => clearTimeout(glowTimer));
       <div>
         <dt>What you'll do</dt>
         <dd>{{ m.teaser }}</dd>
+      </div>
+      <div v-if="m.concepts?.length">
+        <dt>Temporal concepts</dt>
+        <dd><ConceptChips :key="m.id" :ids="m.concepts" label="" /></dd>
       </div>
       <div>
         <dt>How long</dt>

@@ -1,0 +1,156 @@
+# The Temporal concepts the course teaches: one list, so a module's `concepts:` can only name
+# these, and the map can show where each one is taught (and what isn't yet).
+#
+#   id       stable: what modules' `concepts:` name
+#   name     the chip's label
+#   short    one line, on the chip's card
+#   docs     Temporal's docs (or blog) on it
+#   detect   optional: regexes for the code that marks it (@workflow.update, workflow.patched).
+#            A module whose snippets match one has to list the concept (content/build.mjs), so
+#            the chips can't drift from the code. Not for what nearly every module calls
+#            (execute_activity, a timeout): those are taught once, where they're the point.
+#
+# A concept no module lists yet is shown on the map as not in the course yet.
+
+- id: workflow
+  name: Workflow
+  short: A durable function. Temporal records each step it takes, so it can resume anywhere.
+  docs: https://docs.temporal.io/workflows
+
+- id: activity
+  name: Activity
+  short: A step with side effects, such as a network call. Temporal retries it for you.
+  docs: https://docs.temporal.io/activities
+
+- id: worker
+  name: Worker
+  short: The process that runs your workflow and activity code. It polls a task queue for work.
+  docs: https://docs.temporal.io/workers
+
+- id: task-queue
+  name: Task Queue
+  short: Where Temporal keeps work until a worker asks for it. With no worker, the work waits.
+  docs: https://docs.temporal.io/task-queue
+
+- id: durable-execution
+  name: Durable execution
+  short: A crash or a bug pauses the work instead of losing it, and it carries on from where it was.
+  docs: https://docs.temporal.io/evaluate/understanding-temporal
+
+- id: event-history
+  name: Event History
+  short: The record of everything a workflow did. It's the source of truth, not the worker's memory.
+  docs: https://docs.temporal.io/encyclopedia/event-history
+
+- id: replay
+  name: Replay
+  short: A worker runs the workflow code again over its history, to rebuild where it was.
+  docs: https://docs.temporal.io/encyclopedia/event-history
+
+- id: retry-policy
+  name: Retry policy
+  short: How Temporal retries a failing activity, with backoff, so you write no retry loop.
+  docs: https://docs.temporal.io/encyclopedia/retry-policies
+  detect: ['RetryPolicy\(']
+
+- id: timeout
+  name: Activity timeout
+  short: How long an activity attempt may take before Temporal calls it failed and retries it.
+  docs: https://docs.temporal.io/encyclopedia/detecting-activity-failures
+
+- id: query
+  name: Query
+  short: Reads a running workflow's state. It never changes it, and isn't written to the history.
+  docs: https://docs.temporal.io/encyclopedia/workflow-message-passing
+  detect: ['@workflow\.query']
+
+- id: signal
+  name: Signal
+  short: A message that changes a running workflow, fire and forget. It's recorded even with no worker running.
+  docs: https://docs.temporal.io/encyclopedia/workflow-message-passing
+  detect: ['@workflow\.signal']
+
+- id: update
+  name: Update
+  short: A message that changes a running workflow, and gets an answer back.
+  docs: https://docs.temporal.io/encyclopedia/workflow-message-passing
+  detect: ['@workflow\.update']
+
+- id: validator
+  name: Update validator
+  short: Runs before an Update is accepted. An Update it turns away is never written to the history.
+  docs: https://docs.temporal.io/develop/python/workflows/message-passing
+  detect: ['\.validator\b']
+
+- id: timer
+  name: Durable timer
+  short: A wait that Temporal keeps, so it fires on time even while no worker is running.
+  docs: https://docs.temporal.io/workflow-execution/timers-delays
+  detect: ['workflow\.sleep\(', '\btimeout=timedelta']
+
+- id: wait-condition
+  name: wait_condition
+  short: Waits, durably, until the workflow's own state says to go on, for as long as it takes.
+  docs: https://docs.temporal.io/develop/python/workflows/message-passing
+  detect: ['wait_condition\(']
+
+- id: child-workflow
+  name: Child workflow
+  short: A workflow started by another, with its own history. Split big work into parts.
+  docs: https://docs.temporal.io/child-workflows
+  detect: ['execute_child_workflow\(', 'start_child_workflow\(']
+
+- id: non-retryable
+  name: Non-retryable error
+  short: A failure that retrying won't fix, so it fails at once instead of being retried.
+  docs: https://docs.temporal.io/references/failures
+  detect: ['non_retryable=True']
+
+- id: saga
+  name: Saga
+  short: Undo the steps that already happened, newest first, when a later one fails.
+  docs: https://temporal.io/blog/saga-pattern-made-easy
+
+- id: determinism
+  name: Determinism
+  short: Workflow code must make the same decisions on every replay, or the worker can't carry on.
+  docs: https://docs.temporal.io/workflow-definition
+
+- id: versioning
+  name: Versioning
+  short: Change a workflow while old runs are still in flight, with a patch they all agree on.
+  docs: https://docs.temporal.io/develop/python/workflows/versioning
+  detect: ['workflow\.patched\(', 'deprecate_patch\(']
+
+- id: replay-testing
+  name: Replay testing
+  short: Replay real histories on new code before shipping it, to catch a change that would break them.
+  docs: https://docs.temporal.io/develop/python/best-practices/testing-suite
+  detect: ['Replayer\(']
+
+- id: continue-as-new
+  name: Continue-As-New
+  short: Start a fresh run with the same id, to keep a long-lived workflow's history small.
+  docs: https://docs.temporal.io/workflow-execution/continue-as-new
+  detect: ['continue_as_new\(']
+
+- id: cancellation
+  name: Cancellation
+  short: Ask a workflow or activity to stop, and let it clean up on the way out.
+  docs: https://docs.temporal.io/develop/python/workflows/cancellation
+
+- id: heartbeat
+  name: Heartbeat
+  short: A long activity's sign of life, so Temporal notices sooner when its worker dies.
+  docs: https://docs.temporal.io/encyclopedia/detecting-activity-failures
+  detect: ['activity\.heartbeat\(']
+
+- id: schedule
+  name: Schedule
+  short: Starts a workflow on a calendar or an interval, and catches up on runs it missed.
+  docs: https://docs.temporal.io/schedule
+
+- id: search-attribute
+  name: Search Attribute
+  short: An indexed field on a workflow, so you can find workflows by it.
+  docs: https://docs.temporal.io/search-attribute

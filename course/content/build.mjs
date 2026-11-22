@@ -234,6 +234,8 @@ function createRenderer() {
   // #workflow/board-sfo-jfk ([open it](#workflow/board-sfo-jfk/query)) opens the latest of
   // exercise 1's workflows whose id starts with that, in the Temporal UI pane, on a tab if one
   // follows (history, pending-activities, query…). #trip/SFO-JFK is short for #workflow/hello-sfo-jfk.
+  // #workflow/book-sfo-jfk/update/new_card?card=4242 opens it with Send an Update filled in (the
+  // Update's name, and the query as its JSON input) for the learner to Submit (proxy.mjs).
   // On the Trip board, [Open the trip's logbook](#latest-trip) is a button that opens its latest
   // trip's workflow, on its compact event history (#latest-trip/pending-activities: on that tab).
   // Locally, they're all just their words.
@@ -245,7 +247,10 @@ function createRenderer() {
         const token = block.children[i];
         const href = token.type === "link_open" ? token.attrGet("href") ?? "" : "";
         const trip = href.match(/^#trip\/([A-Za-z]{3})-([A-Za-z]{3})(?:\/([a-z-]+))?$/);
-        const flow = trip ? [null, `hello-${trip[1]}-${trip[2]}`.toLowerCase(), trip[3]] : href.match(/^#workflow\/([a-z0-9-]+)(?:\/([a-z-]+))?$/);
+        const update = href.match(/^#workflow\/([a-z0-9-]+)\/update\/([A-Za-z_][A-Za-z0-9_]*)(?:\?(.*))?$/);
+        const flow = trip
+          ? [null, `hello-${trip[1]}-${trip[2]}`.toLowerCase(), trip[3]]
+          : update ? [null, update[1], null] : href.match(/^#workflow\/([a-z0-9-]+)(?:\/([a-z-]+))?$/);
         // #board/pull-plug/after-book_hotel: the button waits for that step to be done on the trip (and
         // its twin), saying so in the link's title ("Pull the plug once the hotel is booked").
         const boardMatch = href.match(/^#board\/([a-z-]+)(?:\/after-([a-z_]+))?$/);
@@ -278,6 +283,8 @@ function createRenderer() {
               ? `<button class="button button-primary" type="button" data-share>${escapeAttr(label)}</button>`
               : latest
               ? `<button class="board-action is-open" type="button" data-board-trip data-workflow-tab="${latest[1] ?? "compact"}" title="Open the latest trip in the Temporal UI">${escapeAttr(label)}</button>`
+              : update
+              ? `<button class="workflow-link" type="button" data-workflow-open="${flow[1]}-" data-workflow-update="${update[2]}" data-update-input="${escapeAttr(JSON.stringify(Object.fromEntries(new URLSearchParams(update[3] ?? ""))))}" title="Open Send an Update in the Temporal UI, filled in">${escapeAttr(label)}</button>`
               : flow
               ? `<button class="workflow-link" type="button" data-workflow-open="${flow[1]}-"${flow[2] ? ` data-workflow-tab="${flow[2]}"` : ""} title="Open it in the Temporal UI">${escapeAttr(label)}</button>`
               : `<button class="sandbox-start" type="button" data-sandbox-start>${escapeAttr(label)}</button>`;
@@ -707,6 +714,52 @@ function subdirs(rel) {
 
 // Every branch and module under quests/, and the paths through them, checked: ids unique, every
 // module a module requires exists, and no module requires itself, however indirectly.
+// The Temporal concepts the course teaches (quests/concepts.yaml): each module's `concepts:` names
+// some of them, shown as chips on its steps and on the map.
+export function loadConcepts() {
+  const source = `${QUESTS}/concepts.yaml`;
+  const list = YAML.parse(read(source)) ?? [];
+  const seen = new Set();
+  return list.map((c) => {
+    for (const key of ["id", "name", "short", "docs"]) if (!c[key]) throw new Error(`${source}: a concept has no ${key} (${JSON.stringify(c)})`);
+    if (seen.has(c.id)) throw new Error(`${source}: concept ${c.id} is listed twice`);
+    seen.add(c.id);
+    if (!/^https:\/\//.test(c.docs)) throw new Error(`${source}: ${c.id}'s docs isn't an https link`);
+    const detect = (c.detect ?? []).map((re) => {
+      try {
+        return new RegExp(re);
+      } catch (err) {
+        throw new Error(`${source}: ${c.id}'s detect ${re} isn't a regex (${err.message})`);
+      }
+    });
+    return { id: c.id, name: c.name, short: c.short, docs: c.docs, detect };
+  });
+}
+
+// A module's concepts: each one a concept, and every concept its code snippets use listed, so the
+// chips can't drift from the code. In a branch where any module lists concepts, every module does.
+export function checkConcepts(branches, modules, concepts) {
+  const byId = new Map(concepts.map((c) => [c.id, c]));
+  for (const branch of branches) {
+    const mods = branch.modules.map((id) => modules.get(id)).filter((m) => m.kind === "module");
+    const tagged = mods.some((m) => m.concepts);
+    for (const m of mods) {
+      if (!m.concepts) {
+        if (tagged && m.status === "ready") throw new Error(`${m.source}: no concepts, though other ${branch.id} modules list theirs (quests/concepts.yaml)`);
+        continue;
+      }
+      if (!Array.isArray(m.concepts) || !m.concepts.length) throw new Error(`${m.source}: concepts should be a list of concept ids`);
+      for (const id of m.concepts) if (!byId.has(id)) throw new Error(`${m.source}: concept ${id} isn't in quests/concepts.yaml`);
+      if (new Set(m.concepts).size !== m.concepts.length) throw new Error(`${m.source}: a concept is listed twice`);
+      const code = [...m.body.matchAll(/```python[^\n]*\n([\s\S]*?)```/g)].map((x) => x[1]).join("\n");
+      for (const c of concepts) {
+        const hit = c.detect.find((re) => re.test(code));
+        if (hit && !m.concepts.includes(c.id)) throw new Error(`${m.source}: its code uses ${c.name} (${hit.source}), but its concepts don't list ${c.id}`);
+      }
+    }
+  }
+}
+
 export function loadQuests() {
   const personas = loadPersonas();
   const branches = [];
@@ -814,7 +867,9 @@ export function loadQuests() {
     if (!seen.length) throw new Error(`${source}: no persona sees all of its modules`);
     paths.push({ ...p, source, personas: seen, modules: withChallenges(listed, modules) });
   }
-  return { branches, modules, paths, personas };
+  const concepts = loadConcepts();
+  checkConcepts(branches, modules, concepts);
+  return { branches, modules, paths, personas, concepts };
 }
 
 // --- Badges -----------------------------------------------------------------------------------
@@ -894,10 +949,15 @@ export function loadBadges(quests) {
   for (const b of skills) {
     for (const key of ["id", "name", "icon", "rule", "criteria"]) if (b[key] == null) throw new Error(`${source}: a badge has no ${key}`);
     if (!SKILL_RULES.includes(b.rule)) throw new Error(`${source}: ${b.id}'s rule ${b.rule} isn't one of ${SKILL_RULES.join(", ")}`);
-    if (b.rule === "pass" && !quests.modules.has(b.module)) throw new Error(`${source}: ${b.id} passes ${b.module}, which isn't a module`);
+    // pass: one module (`module`), or a milestone of a few (`modules`), every one passed.
+    if (b.rule === "pass") {
+      const ids = b.modules ?? (b.module ? [b.module] : []);
+      if (!ids.length || (b.module && b.modules)) throw new Error(`${source}: ${b.id} passes a module (module) or a few (modules), not ${b.module && b.modules ? "both" : "neither"}`);
+      for (const id of ids) if (!quests.modules.has(id)) throw new Error(`${source}: ${b.id} passes ${id}, which isn't a module`);
+    }
     const everyone = quests.personas.map((p) => p.id);
     for (const id of b.personas ?? []) if (!everyone.includes(id)) throw new Error(`${source}: ${b.id}'s persona ${id} isn't one of ${everyone.join(", ")}`);
-    add({ id: b.id, personas: b.personas ?? everyone, kind: "skill", name: b.name, icon: b.icon, rule: b.rule, ...(b.module ? { module: b.module } : {}), criteria: b.criteria }, source);
+    add({ id: b.id, personas: b.personas ?? everyone, kind: "skill", name: b.name, icon: b.icon, rule: b.rule, ...(b.module ? { module: b.module } : {}), ...(b.modules ? { modules: b.modules } : {}), criteria: b.criteria }, source);
   }
   return badges;
 }
@@ -1187,14 +1247,15 @@ function buildExercise(md, quests, ex, number) {
   };
 }
 
-// A branch with `maxWords` (Essentials: 100) keeps each of the guide's messages that short, so
-// each one can be read at a glance. Words as the learner reads them: the HTML's text.
+// A branch with `maxWords` (Essentials: 100, Fundamentals: 150) keeps each of the guide's
+// messages that short, so each one can be read at a glance. Words as the learner reads them: the
+// HTML's text, not counting code blocks (a snippet is read as code, not prose).
 export function wordsIn(html) {
   return html.replace(/<[^>]+>/g, " ").replace(/&[a-z#0-9]+;/gi, " ").split(/\s+/).filter((t) => /[\p{L}\p{N}]/u.test(t)).length;
 }
 export function checkWords(page, max, where) {
   for (const beat of [{ title: "its introduction", html: page.intro }, ...page.sections]) {
-    const n = wordsIn(beat.html ?? "");
+    const n = wordsIn((beat.html ?? "").replace(/<div class="snippet">[\s\S]*?<\/pre><\/div>/g, " ").replace(/<pre[\s\S]*?<\/pre>/g, " "));
     if (n > max) throw new Error(`${where}: "${beat.title}" is ${n} words; its branch keeps each message to ${max} (maxWords)`);
   }
 }
@@ -1347,6 +1408,7 @@ function assembleCourse() {
       status: m.status,
       check: m.check.kind,
       exercise: moduleExercise.get(m.source) ?? null,
+      ...(m.concepts ? { concepts: m.concepts } : {}),
       ...(m.emoji ? { emoji: m.emoji } : {}),
       ...(m.note ? { note: m.note } : {}),
       ...(m.kind === "boss" ? { pool: m.pool ?? [] } : {}),
@@ -1355,6 +1417,8 @@ function assembleCourse() {
     })),
     paths: quests.paths.map((p) => ({ id: p.id, title: p.title, modules: p.modules, personas: p.personas })),
     personas: quests.personas,
+    // Every concept, with the modules that teach it (none: not in the course yet).
+    concepts: quests.concepts.map(({ detect, ...c }) => ({ ...c, modules: [...quests.modules.values()].filter((m) => m.concepts?.includes(c.id)).map((m) => m.id) })),
     badges: loadBadges(quests),
   };
 }

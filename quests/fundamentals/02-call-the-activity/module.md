@@ -3,6 +3,7 @@ id: F2
 title: Call the activity
 teaser: "Your first TODO: ask Temporal to run an activity, with a timeout and a retry policy."
 learn: "How a workflow calls an activity, and what its timeout and retry policy are for."
+concepts: [activity, timeout, retry-policy]
 minutes: 5
 xp: 10
 tier: 1

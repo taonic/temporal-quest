@@ -3,6 +3,7 @@ id: F10
 title: One trip, several legs
 teaser: "Split an itinerary into child workflows, one a leg, run at once, each with a history of its own."
 learn: "Child workflows: work split into parts that run at once, each with its own history."
+concepts: [child-workflow]
 minutes: 5
 xp: 10
 tier: 2
@@ -25,7 +26,7 @@ questions:
 
 ## 4. One trip, several legs
 
-An itinerary like SFO → JFK → LHR is two trips. You already have a workflow for a trip: `HelloTripWorkflow`, from exercise 1. So the itinerary doesn't look anything up itself. It starts a **child workflow** for each leg, all at once, and puts their answers together. Open `hello/itinerary.py`: `run()` splits the stops into legs and runs `leg()` for each. Replace the `TODO(ch06)` in `leg()` with:
+An itinerary like SFO → JFK → LHR is two trips, and you already have a workflow for a trip: `HelloTripWorkflow`. So the itinerary starts a **child workflow** for each leg, all at once, and joins their answers. In `hello/itinerary.py`, `run()` splits the stops into legs and runs `leg()` for each. Replace the `TODO(ch06)` in `leg()` with:
 
 ```python hello/itinerary.py
 # A child workflow: started, and waited for, by this one. Its id is this workflow's, plus
@@ -37,14 +38,9 @@ return await workflow.execute_child_workflow(
 )
 ```
 
-Restart the worker, and plan the trip:
+- Restart the worker, and plan the trip: `uv run hello-itinerary SFO JFK LHR`. It prints both legs.
+- <!-- browser
+[Open the itinerary's Event History](#workflow/itinerary-sfo-jfk-lhr/history):
+--><!-- local -->Open the itinerary's **Event History**:<!-- /local --> two **Start Child Workflow Execution Initiated**, then two **Child Workflow Execution Completed**, and no lookups. Click a child: it's a workflow of its own, with its own history and lookups.
 
-```bash
-uv run hello-itinerary SFO JFK LHR
-```
-
-It prints both legs. <!-- browser
-[Open the itinerary's Event History](#workflow/itinerary-sfo-jfk-lhr/history)
---><!-- local -->Open the itinerary's **Event History**<!-- /local -->: two **Start Child Workflow Execution Initiated**, then two **Child Workflow Execution Completed**, and no lookups. Click one of the children: it's a workflow of its own, with its own history, and its two `lookup_airport` activities.
-
-Why a child and not just more activities in one workflow? Each child keeps its own history, so a job with thousands of steps doesn't make one enormous one. A child can run on another team's worker, with its own retries and timeouts. And it's the same workflow you'd start on its own: the trip didn't change at all to become a leg.
+Why a child? Each keeps its own history, so thousands of steps don't make one huge one, and it can run on another team's worker. The trip didn't change at all to become a leg.

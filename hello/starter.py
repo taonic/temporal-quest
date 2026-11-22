@@ -1,19 +1,14 @@
-"""The client: start a workflow and wait for its result.
+"""The client: start or message a workflow, and wait for its result.
 
-    uv run hello-start SFO JFK
-    uv run hello-board SFO JFK [SEATS]
-    uv run hello-hold 12A [SECONDS]
-    uv run hello-pay 12A 4242
-    uv run hello-itinerary SFO JFK LHR
-    uv run hello-book SFO JFK 4242
+    uv run hello-start SFO JFK    (also hello-board, -hold, -pay, -itinerary, -book)
 
-Starting a workflow only records it in Temporal; a worker runs it. Start one with no worker
-running and it simply waits.
+Starting a workflow only records it; a worker runs it. With no worker, it waits.
 """
 
 import asyncio
 import sys
 import uuid
+from collections.abc import Awaitable, Callable
 
 from temporalio.client import WorkflowFailureError, WorkflowHandle, WorkflowUpdateFailedError
 
@@ -77,7 +72,7 @@ async def pay(seat: str, card: str) -> None:
         # An update waits for a worker to run it: give up after a while, rather than hang.
         print(await asyncio.wait_for(handle.execute_update(FareHoldWorkflow.pay, Payment(card=card)), timeout=15))
     except WorkflowUpdateFailedError as err:
-        sys.exit(f"Payment refused: {err.cause}")
+        sys.exit(f"Payment refused: {why(err)}")
     except TimeoutError:
         sys.exit(f"No answer from {found[0]} in 15 seconds: is a worker running? Open it in the Temporal UI to see.")
 
@@ -96,18 +91,48 @@ async def book(origin: str, destination: str, card: str) -> None:
     workflow_id = f"book-{origin.lower()}-{destination.lower()}-{uuid.uuid4().hex[:4]}"
     booking = Booking(origin=origin, destination=destination, card=card)
     handle = await client.start_workflow(BookTripWorkflow.run, booking, id=workflow_id, task_queue=TASK_QUEUE)
-    await wait_for(handle, workflow_id)
+    # A booking whose card has expired waits, for as long as it takes, for a new one. Say so and
+    # stop, rather than wait here with it: the new card comes from this terminal.
+    async def waiting_for_new_card(handle: WorkflowHandle) -> bool:
+        try:
+            status = await asyncio.wait_for(handle.query(BookTripWorkflow.status), timeout=2)
+        except Exception:  # noqa: BLE001 - no worker to answer yet: keep waiting
+            return False
+        if not status.waiting_for_new_card:
+            return False
+        print(f"The card ending {status.card} has expired. The booking is waiting for a new one, holding the")
+        print("flight and the hotel. Send it one from the Temporal UI: More Actions, Send an Update, new_card.")
+        return True
+
+    await wait_for(handle, workflow_id, waiting_for_new_card)
 
 
-async def wait_for(handle: WorkflowHandle, workflow_id: str) -> None:
+async def wait_for(
+    handle: WorkflowHandle, workflow_id: str, stop: Callable[[WorkflowHandle], Awaitable[bool]] | None = None
+) -> None:
     url = f"{settings.temporal_ui_url}/namespaces/{settings.temporal_namespace}/workflows/{workflow_id}"
     print(f"Started {workflow_id}: {url}", flush=True)
     print("Waiting for the result...", flush=True)
+    result = asyncio.ensure_future(handle.result())
+    # `stop`, if given, is asked every second whether to stop waiting (and says why if so).
+    while stop is not None and not result.done():
+        await asyncio.wait({result}, timeout=1)
+        if not result.done() and await stop(handle):
+            result.cancel()
+            return
     try:
-        result = await handle.result()
+        result = await result
     except WorkflowFailureError as err:
-        sys.exit(f"The workflow failed: {err.cause}")
+        sys.exit(f"The workflow failed: {why(err)}")
     print("\n".join(result) if isinstance(result, list) else result)
+
+
+def why(err: Exception) -> str:
+    # The innermost cause says what went wrong ("card ending 0000 was declined"); the ones around
+    # it only say where ("Activity task failed").
+    while err.__cause__ is not None:
+        err = err.__cause__
+    return getattr(err, "message", None) or str(err)
 
 
 def run() -> None:
@@ -147,7 +172,7 @@ def run_itinerary() -> None:
 
 def run_book() -> None:
     if len(sys.argv) != 4:
-        sys.exit("usage: hello-book ORIGIN DESTINATION CARD   (e.g. SFO JFK 4242; 0000 is declined)")
+        sys.exit("usage: hello-book ORIGIN DESTINATION CARD   (e.g. SFO JFK 4242; 0000 is declined, 1111 has expired)")
     asyncio.run(book(sys.argv[1].upper(), sys.argv[2].upper(), sys.argv[3]))
 
 

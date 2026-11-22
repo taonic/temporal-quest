@@ -3,6 +3,7 @@ id: F1
 title: Run it, and see it stop
 teaser: Meet the pieces of a Temporal program, start a workflow, and watch a bug pause it instead of failing it.
 learn: "The pieces of a Temporal program, and why a bug pauses a workflow instead of failing it."
+concepts: [workflow, worker, durable-execution]
 minutes: 7
 xp: 10
 tier: 1
@@ -67,15 +68,15 @@ There's no agent yet. Every idea here comes back in the next three exercises.
 
 | Piece | What it is | In this exercise |
 |---|---|---|
-| **Workflow** | A durable function. Temporal records every step it takes, so it can resume anywhere. | `HelloTripWorkflow` in `hello/workflow.py` |
+| **Workflow** | A durable function: Temporal records every step, so it can resume anywhere. | `HelloTripWorkflow` in `hello/workflow.py` |
 | **Activity** | A step with side effects: a network call, a database write, a model call. | `lookup_airport` in `hello/activities.py` |
 | **Worker** | The process that runs your workflow and activity code. | `uv run hello-worker` |
 | **Client** | Starts workflows and asks about them. | `uv run hello-start SFO JFK` |
-| **History** | The record of every step, which Temporal stores. It's the source of truth. | The Temporal UI, http://localhost:8233 |
+| **History** | Every step, recorded by Temporal: the source of truth. | The Temporal UI, http://localhost:8233 |
 
 ### How the pieces fit together
 
-Take a minute with this diagram before you start. Follow a trip from the starter to the server, to the worker, to the activity and back, and find each piece from the table. Every step below works one part of it: you'll break the activity, stop the worker and watch the history carry on, so knowing where each piece sits now makes those moments make sense. Click it for a larger version you can explore.
+Follow a trip through this diagram: from the starter to the server, the worker and the activity, and back. The steps below break or stop these pieces one at a time, so it helps to know where each sits. Click it to explore a larger version.
 
 [![The starter (hello-start SFO JFK) asks the Temporal server to start a workflow, and the server keeps that workflow's history. The hello-worker runs HelloTripWorkflow, which calls the lookup_airport activity; with FLAKY=1 its attempts 1 to 4 fail, and the RetryPolicy (2s, ×2, at most 6s) retries until attempt 5 gets through. The Temporal UI reads the history. The history, not the worker, holds the run: a new worker replays it and carries on, and with no worker the work waits and nothing is lost.](../../../docs/architecture/ex1-hello.png)](../../../docs/architecture/ex1-hello.html)
 

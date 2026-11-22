@@ -29,19 +29,21 @@ export function badgeContext(modules, rightChoice) {
 }
 
 const ready = (ctx, ids) => ids.filter((id) => ctx.byId.get(id)?.status === "ready");
+// The modules a boss or pass badge needs: its module, or a milestone's few (`modules`).
+const passIds = (badge) => badge.modules ?? (badge.module ? [badge.module] : []);
 
 // The ready modules a badge needs that aren't done: an earned tier badge that shows them has
 // grown since ("+1 new module").
 export function missingFor(badge, ctx, completed) {
   const done = new Set(completed);
-  const ids = badge.kind === "tier" ? badge.modules : badge.module ? [badge.module] : [];
+  const ids = badge.kind === "tier" ? badge.modules : passIds(badge);
   return ready(ctx, ids).filter((id) => !done.has(id));
 }
 
 // Whether nothing a badge needs has shipped yet (a stub branch's tier, a boss to come).
 export function isComingSoon(badge, ctx) {
   if (badge.kind === "tier") return ready(ctx, badge.modules).length === 0;
-  if (badge.kind === "boss" || badge.rule === "pass") return ready(ctx, [badge.module]).length === 0;
+  if (badge.kind === "boss" || badge.rule === "pass") return ready(ctx, passIds(badge)).length === 0;
   return false;
 }
 
@@ -56,8 +58,10 @@ export function meets(badge, ctx, state) {
       return need.length > 0 && need.every((id) => done.has(id));
     }
     case "boss":
-    case "pass":
-      return ready(ctx, [badge.module]).length > 0 && done.has(badge.module);
+    case "pass": {
+      const need = ready(ctx, passIds(badge));
+      return need.length > 0 && need.every((id) => done.has(id));
+    }
     case "explorer":
       return branchList.length > 0 && branchList.every((mods) => mods.some((m) => m.kind === "module" && done.has(m.id)));
     case "clean-run":

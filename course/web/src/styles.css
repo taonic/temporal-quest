@@ -9470,3 +9470,154 @@ a.menu-item {
     animation: none;
   }
 }
+
+/* --- Temporal concepts (quests/concepts.yaml): chips on a step and a map card, and the map's
+   Concept picker, which lights the modules that teach one and steps the rest back. --- */
+.concept-chips {
+  margin: 0 0 10px;
+}
+
+.concept-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+
+.concept-label {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.concept-chip {
+  display: inline-block;
+  padding: 2px 9px;
+  border: 1px solid color-mix(in srgb, var(--temporal-uv) 45%, transparent);
+  border-radius: 999px;
+  background: var(--temporal-uv-soft);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.concept-chip:hover,
+.concept-chip.is-open {
+  border-color: var(--temporal-uv);
+}
+
+.concept-chip.is-open {
+  background: var(--temporal-uv);
+  color: var(--paper);
+}
+
+.concept-chip:focus-visible {
+  outline: 2px solid var(--temporal-uv);
+  outline-offset: 2px;
+}
+
+.concept-card {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--temporal-uv);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  background: var(--mist);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.concept-card p {
+  margin: 0;
+}
+
+.concept-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 6px !important;
+}
+
+.concept-ask {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--temporal-uv);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.map-concept-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 0;
+  font-size: 13px;
+}
+
+.map-concept-clear {
+  margin-left: auto;
+}
+
+.map-node.off-concept,
+.focus-node.off-concept,
+.map-list-row.off-concept {
+  opacity: 0.25;
+  transition: opacity 200ms ease;
+}
+
+.map-node.has-concept {
+  filter: drop-shadow(0 0 6px var(--temporal-uv));
+}
+
+.focus-node.has-concept,
+.map-list-row.has-concept {
+  outline: 2px solid var(--temporal-uv);
+  outline-offset: 2px;
+  border-radius: var(--radius);
+}
+
+/* A node's concepts on the map: one quiet line under its title. */
+.map-label-concept {
+  fill: var(--faint);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.map-node.has-concept .map-label-concept {
+  fill: var(--temporal-uv);
+}
+
+.focus-node-concepts {
+  display: flex;
+  justify-content: center;
+  gap: 3px;
+  max-width: 100%;
+  white-space: nowrap;
+  margin-top: 3px;
+  color: var(--faint);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.focus-node.has-concept .focus-node-concepts {
+  color: var(--temporal-uv);
+}
+
+.focus-node-concept-names {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.focus-node-concept-more {
+  flex: none;
+}

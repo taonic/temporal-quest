@@ -47,6 +47,8 @@ async def send_hold_email(hold: HoldRequest) -> None:
 
 # A card that always declines, so you can watch the saga undo what it already did.
 DECLINED_CARD = "0000"
+# A card that has expired, so you can watch the booking wait for the traveller's new one.
+EXPIRED_CARD = "1111"
 
 
 @activity.defn
@@ -69,6 +71,9 @@ async def charge_card(booking: Booking) -> str:
         # Retrying won't change the bank's mind: a non-retryable error fails the activity at once,
         # instead of the retry policy trying it again.
         raise ApplicationError(f"card ending {booking.card} was declined", type="CardDeclined", non_retryable=True)
+    if booking.card == EXPIRED_CARD:
+        # Final too: no retry brings an expired card back. But the traveller can give another one.
+        raise ApplicationError(f"card ending {booking.card} has expired", type="CardExpired", non_retryable=True)
     activity.logger.info("Charged the card ending %s", booking.card)
     return f"PAY-{booking.card}"
 

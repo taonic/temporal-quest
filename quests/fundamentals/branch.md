@@ -8,6 +8,7 @@ order: 1
 classTitle: Durable Apprentice
 worker: uv run hello-worker
 agentUi: false
+maxWords: 150
 tiers:
   - name: Durable execution
     badge:

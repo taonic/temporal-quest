@@ -3,7 +3,7 @@
 // title. A click selects it. The focus view draws Fundamentals' first tier with it, and a
 // specialization's tiers when its card expands.
 import NodeGlyph from "./NodeGlyph.vue";
-import { STATE_LABEL, activePath, branchesById, idOf, isDone, isPlayable, stateOf } from "../progress.js";
+import { STATE_LABEL, activePath, branchesById, conceptLineParts, conceptLit, conceptsOf, idOf, isDone, isPlayable, stateOf } from "../progress.js";
 import { computed } from "vue";
 
 const props = defineProps({
@@ -15,6 +15,8 @@ const props = defineProps({
 const emit = defineEmits(["select"]);
 
 const pathIndex = computed(() => new Map((activePath.value?.modules ?? []).map((id, i) => [id, i + 1])));
+// The concept picked on the map: the modules that teach it are lit (progress.js).
+const lit = computed(() => conceptLit.value);
 const kindLabel = (m) => (m.kind === "boss" ? "Boss" : m.kind === "challenge" ? "Challenge" : idOf(m));
 const nodeLabel = (m) => `${kindLabel(m) ? `${kindLabel(m)}: ` : ""}${m.title}. ${STATE_LABEL[stateOf(m)]}${isPlayable(m) ? "" : ", coming soon"}`;
 </script>
@@ -24,7 +26,7 @@ const nodeLabel = (m) => `${kindLabel(m) ? `${kindLabel(m)}: ` : ""}${m.title}. 
     <li v-for="m in modules" :key="m.id" :class="[`branch-${branchesById.get(m.branch).color}`, { 'is-lit': isDone(m.id) }]">
       <button
         type="button"
-        :class="['focus-node', `is-${stateOf(m)}`, { 'is-selected': selected === m.id }]"
+        :class="['focus-node', `is-${stateOf(m)}`, { 'is-selected': selected === m.id, 'has-concept': lit?.has(m.id), 'off-concept': lit && !lit.has(m.id) }]"
         :data-module="m.id"
         :data-exercise="m.exercise || null"
         :aria-pressed="selected === m.id"
@@ -40,6 +42,7 @@ const nodeLabel = (m) => `${kindLabel(m) ? `${kindLabel(m)}: ` : ""}${m.title}. 
           <span class="focus-node-min">{{ m.minutes }} min</span>
         </span>
         <span class="focus-node-title">{{ m.title }}</span>
+        <span v-if="conceptsOf(m).length" class="focus-node-concepts" :title="conceptsOf(m).map((c) => c.name).join(' · ')"><span class="focus-node-concept-names">{{ conceptLineParts(m, 15).names }}</span><span v-if="conceptLineParts(m, 15).more" class="focus-node-concept-more">{{ conceptLineParts(m, 15).more }}</span></span>
       </button>
     </li>
   </ol>

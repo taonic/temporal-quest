@@ -24,6 +24,31 @@ export const modulesById = new Map(course.modules.map((m) => [m.id, m]));
 // another persona is kept, and counts (its XP), though this persona's map doesn't show it.
 const anyModuleById = new Map(fullCourse.modules.map((m) => [m.id, m]));
 export const branchesById = new Map(course.branches.map((b) => [b.id, b]));
+// The Temporal concepts (quests/concepts.yaml), each with the modules that teach it.
+export const concepts = course.concepts ?? [];
+export const conceptsById = new Map(concepts.map((c) => [c.id, c]));
+// A module's concepts, as concept objects (none for a module that lists none).
+export const conceptsOf = (m) => (m?.concepts ?? []).map((id) => conceptsById.get(id)).filter(Boolean);
+// The concept picked on the map, and the modules that teach it: the map lights those and steps
+// the rest back (null: none picked).
+export const conceptOnMap = computed(() => conceptsById.get(store.mapConcept) ?? null);
+export const conceptLit = computed(() => (conceptOnMap.value ? new Set(conceptOnMap.value.modules) : null));
+// A node's concepts on the map, quietly, on one line: the first one, a second if the line stays
+// within `chars`, and how many more ("Update · Update validator", "Saga +1"). The concept picked
+// on the map comes first, so a lit node says why it's lit. The node's card has them all.
+export function conceptLineParts(m, chars = 18) {
+  const picked = store.mapConcept;
+  const names = conceptsOf(m)
+    .sort((a, b) => (b.id === picked) - (a.id === picked))
+    .map((c) => c.name);
+  if (!names.length) return { names: "", more: "" };
+  const shown = names.length > 1 && `${names[0]} · ${names[1]}`.length <= chars ? 2 : 1;
+  return { names: names.slice(0, shown).join(" · "), more: names.length > shown ? `+${names.length - shown}` : "" };
+}
+export function conceptLine(m, chars = 18) {
+  const { names, more } = conceptLineParts(m, chars);
+  return more ? `${names} ${more}` : names;
+}
 // Every module in map order: branch by branch, each in its own order, its boss last.
 export const mapOrder = course.branches.flatMap((b) => [...b.modules, ...(b.boss ? [b.boss] : [])]);
 

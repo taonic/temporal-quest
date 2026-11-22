@@ -23,6 +23,9 @@ import {
   STATE_LABEL,
   activePath,
   branchesById,
+  conceptLit,
+  conceptOnMap,
+  concepts,
   idOf,
   numbered,
   isDone,
@@ -90,6 +93,15 @@ function select(id) {
 
 function setPath(event) {
   progress.path = event.target.value || null;
+}
+
+// A Temporal concept to find on the map: the modules that teach it light up, the rest step back.
+// Concepts no module teaches yet are listed too, so it's plain what isn't in the course.
+const lit = computed(() => conceptLit.value);
+const concept = computed(() => conceptOnMap.value);
+const conceptTeachers = computed(() => (concept.value?.modules ?? []).map((id) => modulesById.get(id)).filter(Boolean));
+function setConcept(event) {
+  store.mapConcept = event.target.value || null;
 }
 function setView(view) {
   progress.mapView = view;
@@ -183,6 +195,13 @@ const LEGEND = [
                 <option v-for="p in course.paths" :key="p.id" :value="p.id">{{ p.title }}</option>
               </select>
             </label>
+            <label class="map-path-pick map-concept-pick">
+              <span>Concept</span>
+              <select :value="store.mapConcept ?? ''" @change="setConcept">
+                <option value="">None</option>
+                <option v-for="c in concepts" :key="c.id" :value="c.id" :disabled="!c.modules.length">{{ c.name }}{{ c.modules.length ? ` (${c.modules.length})` : ": not in the course yet" }}</option>
+              </select>
+            </label>
             <p class="map-path-progress">
               <template v-if="activePath">
                 <span class="xp-bar is-path"><span :style="{ width: `${(pathDone / pathModules.length) * 100}%` }" /></span>
@@ -191,6 +210,12 @@ const LEGEND = [
               <template v-else>Following an event? Pick its path to number its route.</template>
             </p>
           </div>
+          <p v-if="concept" class="map-concept-note">
+            <span class="concept-chip is-open">{{ concept.name }}</span>
+            <span>{{ concept.short }} Taught in</span>
+            <span v-for="(t, i) in conceptTeachers" :key="t.id"><button type="button" class="focus-link" @click="select(t.id)"><strong>{{ t.id }}</strong> {{ t.title }}</button><template v-if="i < conceptTeachers.length - 1">,</template></span>
+            <button type="button" class="button map-concept-clear" @click="store.mapConcept = null">Clear</button>
+          </p>
           <ul class="map-legend" aria-label="Legend">
             <li v-for="item in LEGEND" :key="item.state"><NodeGlyph :state="item.state" :label="legendId[0]" color="green" :size="22" />{{ item.text }}</li>
             <li><NodeGlyph state="open" :label="legendId[1]" color="slate" soon :size="22" />Coming soon (not playable yet)</li>
@@ -232,7 +257,7 @@ const LEGEND = [
             <template v-for="m in [...tier.modules, ...(tier.n === branch.tiers.length && branch.boss ? [modulesById.get(branch.boss)] : [])]" :key="m.id">
               <button
                 type="button"
-                :class="['map-list-row', `is-${stateOf(m)}`, { 'is-soon': !isPlayable(m), 'is-opened': opened === m.id }]"
+                :class="['map-list-row', `is-${stateOf(m)}`, { 'is-soon': !isPlayable(m), 'is-opened': opened === m.id, 'has-concept': lit?.has(m.id), 'off-concept': lit && !lit.has(m.id) }]"
                 :aria-expanded="opened === m.id"
                 @click="opened = opened === m.id ? null : m.id"
               >

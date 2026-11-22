@@ -3,10 +3,11 @@ id: F12
 title: Change a workflow that's running
 teaser: "Add a step while a hold is running, watch it break that hold, and fix it with a patch."
 learn: "Versioning with patches: changing a workflow while old runs are still in flight."
+concepts: [versioning, determinism]
 minutes: 7
 xp: 10
 tier: 2
-requires: [F11]
+requires: [F14]
 check:
   kind: code
   tests:
@@ -24,30 +25,31 @@ questions:
   - What is Worker Versioning, and how is it different from patching?
 ---
 
-## 6. Break a running hold
+## 10. Add a step while a workflow is running
 
-New requirement: email the traveller when a hold starts. Easy enough, but some holds are already running, and they started without the email.
+New requirement: email the traveller when a hold starts. But some holds are already running, without the email.
 
-Hold seat 14C for two minutes. It's your running hold from before the change:
+Hold seat 14C for two minutes, your hold from before the change:
 
 ```bash
 uv run hello-hold 14C 120
 ```
 
-Now, within those two minutes, add the step to the top of `run()` in `hello/hold.py`, in place of the `TODO(ch06)` there:
+Within those two minutes, put the step at the top of `run()` in `hello/hold.py`, in place of the `TODO(ch06)` there:
 
 ```python hello/hold.py
 # The new step: email the traveller that the seat is held.
 await workflow.execute_activity(send_hold_email, hold, start_to_close_timeout=timedelta(seconds=10))
 ```
 
-Restart the worker, and start a new hold: `uv run hello-hold 15A 20`. The worker's log shows `Emailed the traveller: seat 15A is held for 20s`. Works.
+- Restart the worker, and start a new hold: `uv run hello-hold 15A 20`. The worker's log shows `Emailed the traveller: seat 15A is held for 20s`.
+- When 14C's two minutes are up, <!-- browser
+[open its Event History](#workflow/hold-14c/history).
+--><!-- local -->open its **Event History**.<!-- /local --> It's still **Running**: after **Timer Fired**, a red **Workflow Task Failed**, with a **nondeterminism** error.
 
-Wait for 14C's two minutes to run out, then <!-- browser
-[open 14C's Event History](#workflow/hold-14c/history)
---><!-- local -->open 14C's **Event History**<!-- /local -->. It's still **Running**, past its time: after **Timer Fired**, a red **Workflow Task Failed**, with a **nondeterminism** error. To carry on after the timer, the new worker replayed 14C's history with the new code. The code now says "first, send an email", and the history says the first thing this workflow did was start a timer. The worker can't make the two agree, so it stops, and retries, and fails again, until the code matches.
+The new worker replayed 14C's history on the new code, which says "send an email first", while the history says 14C first started a timer. They can't agree, so the task fails, and is retried, until the code matches.
 
-## 7. Patch it
+## 11. Patch it
 
 The history is right: 14C really did start without an email. The code has to allow for that. Replace your line with:
 

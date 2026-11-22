@@ -16,11 +16,15 @@ export function courseFor(full, persona) {
   const sees = (item) => (item.personas ?? [full.personas?.[0]?.id]).includes(persona);
   const branches = full.branches.filter(sees);
   const branchIds = new Set(branches.map((b) => b.id));
+  const modules = full.modules.filter((m) => branchIds.has(m.branch));
+  const moduleIds = new Set(modules.map((m) => m.id));
   return {
     ...full,
     persona,
     branches,
-    modules: full.modules.filter((m) => branchIds.has(m.branch)),
+    modules,
+    // Each concept with the modules this persona sees that teach it.
+    concepts: (full.concepts ?? []).map((c) => ({ ...c, modules: c.modules.filter((id) => moduleIds.has(id)) })),
     paths: full.paths.filter(sees),
     exercises: full.exercises.filter(sees),
     badges: full.badges.filter(sees),

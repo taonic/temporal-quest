@@ -74,7 +74,7 @@ export const WALKTHROUGHS = {
     await l.worker("running"); // the toggle starts the plain worker: without FLAKY
     await expect(l.terminalText("commands"), "the waiting SEA → LHR starter never finished").toContainText("Your trip: Seattle (SEA) to London (LHR).", { timeout: MINUTE });
 
-    await l.step("Stop it mid-count");
+    await l.step("Count with nothing saved");
     await l.runButton("uv run hello-board SFO JFK", { wait: false });
     const boarded = async () => {
       const all = [...((await l.terminalText("worker").textContent()) ?? "").matchAll(/Boarded passenger (\d+)\/40/g)];
@@ -82,6 +82,7 @@ export const WALKTHROUGHS = {
     };
     await expect.poll(boarded, { message: "the worker never logged a boarding", timeout: MINUTE }).toBeGreaterThan(2);
     const before = await boarded();
+    await l.step("Stop it mid-count");
     await l.worker("stopped");
     await sleep(8 * SECOND);
     await l.worker("running");
@@ -407,7 +408,35 @@ export const WALKTHROUGHS = {
     await l.sawInTerminal("worker", "Cancelled flight FL-SFOJFK", "the saga didn't cancel the flight");
     expect(await l.runButton("uv run hello-book SFO JFK 4242"), "a good card should book the trip").toBe(0);
 
-    await l.step("Break a running hold");
+    await l.step("An expired card undoes the trip");
+    expect(await l.runButton("uv run hello-book SFO JFK 1111"), "before the TODOs, an expired card should fail the booking").not.toBe(0);
+    expect(l.output, "the booking didn't fail on the expired card").toContain("has expired");
+
+    await l.step("Wait instead");
+    await l.openFile("hello/saga.py");
+    await l.insert();
+    await l.restartWorker();
+    expect(await l.runButton("uv run hello-book SFO JFK 1111"), "an expired card should leave the booking waiting").toBe(0);
+    expect(l.flatOutput, "hello-book didn't say the booking is waiting").toContain("waiting for a new one");
+
+    await l.step("Take the new card, not the wrong one");
+    await l.openFile("hello/saga.py");
+    await l.insert();
+    await l.restartWorker();
+    await submitNewCard(l, "1111");
+    await expect(l.temporal.getByRole("dialog").getByText("the card ending 1111 is the one that expired").first(), "the validator didn't turn the expired card away").toBeVisible({ timeout: 30 * SECOND });
+    await submitNewCard(l, "4242");
+    await expect(l.temporal.getByText("Update successful").first(), "the new card's Update didn't succeed").toBeVisible({ timeout: 30 * SECOND });
+    await untilStatus(l, "book-sfo-jfk-", "Completed", "the new card didn't complete the booking");
+    await l.view("Code");
+
+    await l.step("Read what the Update did");
+    await l.openInTemporal("button[data-workflow-open]");
+    await expect(l.temporal.getByText(/Workflow Execution Update Accepted/i).first(), "the history has no accepted Update").toBeVisible({ timeout: 30 * SECOND });
+    await expect(l.temporal.getByText(/Activity Task Failed/i).first(), "the history has no failed charge").toBeVisible();
+    await l.view("Code");
+
+    await l.step("Add a step while a workflow is running");
     expect(await l.runButton("uv run hello-hold 14C 120"), "hello-hold didn't start 14C").toBe(0);
     const heldAt = Date.now();
     await l.openFile("hello/hold.py");
@@ -442,11 +471,22 @@ export const WALKTHROUGHS = {
     expect(await l.runButton("uv run hello-replay hold-14c"), "the replays failed").toBe(0);
     expect(l.flatOutput, "14C didn't replay on this code").toMatch(/✓ hold-14c-\w+ replays on this code/);
     expect(l.flatOutput, "15A didn't replay on this code").toMatch(/✓ hold-15a-\w+ replays on this code/);
+    await l.step("Catch a teammate's change");
     // Not done here: deleting the email step by hand, and replaying again to see 15A fail.
 
     await l.check("06-building-blocks");
   },
 };
+
+// A step's "Send …" button for `card`: the Temporal UI opens Send an Update on the
+// booking, filled in (proxy.mjs), and the learner presses Submit.
+async function submitNewCard(l, card) {
+  await l.body.locator(`button[data-workflow-update="new_card"][data-update-input*='"${card}"']`).first().click();
+  await expect(l.page.getByRole("tab", { name: "Temporal UI", exact: true })).toHaveAttribute("aria-selected", "true");
+  const dialog = l.temporal.getByRole("dialog");
+  await expect(dialog.locator(".cm-content"), `Send an Update wasn't filled in with card ${card}`).toContainText(card, { timeout: 30 * SECOND });
+  await dialog.getByRole("button", { name: "Submit" }).click();
+}
 
 // The workflow open in the Temporal UI (its id starts with `prefix`) ends up with this status,
 // reloaded until it does, as a learner presses refresh.

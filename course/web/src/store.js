@@ -322,8 +322,9 @@ const findWorkflow = (prefix) => store.trips.list?.find((t) => t.id.startsWith(p
 // seconds, so it's asked for afresh first: one started a moment ago may not be in it yet, and
 // when an older one has the same prefix (a second hold on the same seat), that one would open
 // instead. Temporal's list can lag a second behind too: ask again, for a few seconds, before
-// saying it isn't there.
-export async function openWorkflow(prefix, tab = null) {
+// saying it isn't there. With `update` ({name, input}), the Temporal UI opens Send an Update on
+// it, filled in, for the learner to Submit.
+export async function openWorkflow(prefix, tab = null, update = null) {
   if (hooks.poll) await hooks.poll();
   let workflow = findWorkflow(prefix);
   for (let i = 0; !workflow && hooks.poll && i < 4; i++) {
@@ -332,6 +333,7 @@ export async function openWorkflow(prefix, tab = null) {
     workflow = findWorkflow(prefix);
   }
   if (!workflow) return toast("Start it first: it isn't in Temporal yet");
+  if (update) return openPane("temporal", { workflow: workflow.id, tab: "history", update });
   openPane("temporal", tab ? { workflow: workflow.id, tab } : `/namespaces/default/workflows/${encodeURIComponent(workflow.id)}`);
 }
 

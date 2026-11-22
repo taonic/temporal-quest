@@ -104,7 +104,7 @@ test("the course's badges: a tier badge per named tier, a boss badge per boss, a
     assert.ok(boss.name.length <= CLASS_TITLE_MAX);
   }
   assert.equal(course.badges.find((b) => b.id === "fundamentals-1").criteria, "Pass F1–F7, FC1 and FC2");
-  assert.deepEqual(course.badges.filter((b) => b.kind === "skill").map((b) => b.id), ["clean-run", "no-peeking", "flawless", "explorer", "cross-team", ...ESSENTIALS_MODULE_BADGES]);
+  assert.deepEqual(course.badges.filter((b) => b.kind === "skill").map((b) => b.id), ["clean-run", "no-peeking", "flawless", "explorer", "cross-team", ...ESSENTIALS_MODULE_BADGES, ...DEVELOPER_MILESTONES]);
   // Essentials' module badges: one per module, E1 to E8, each earned by passing it.
   const modules = ESSENTIALS_MODULE_BADGES.map((id) => course.badges.find((b) => b.id === id));
   assert.deepEqual(modules.map((b) => [b.rule, b.module]), ["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8"].map((m) => ["pass", m]));
@@ -179,4 +179,43 @@ test("solution_used is a page event, and counts against No Peeking", () => {
 
 test("earnedNow lists every badge met", () => {
   assert.deepEqual(earnedNow(BADGES, ctx, state({ completed: ["F1", "A1"] })), ["no-peeking", "explorer", "cross-team"]);
+});
+
+test("a milestone badge (pass, with modules) is earned with all of them, and coming soon until one ships", () => {
+  const modules = [
+    { id: "F1", kind: "module", branch: "f", status: "ready" },
+    { id: "F2", kind: "module", branch: "f", status: "ready" },
+    { id: "P1", kind: "module", branch: "p", status: "coming-soon" },
+  ];
+  const ctx = badgeContext(modules, () => null);
+  const milestone = { id: "first-run", kind: "skill", rule: "pass", modules: ["F1", "F2"] };
+  assert.equal(meets(milestone, ctx, { completed: ["F1"] }), false);
+  assert.equal(meets(milestone, ctx, { completed: ["F1", "F2"] }), true);
+  assert.deepEqual(missingFor(milestone, ctx, ["F1"]), ["F2"]);
+  assert.equal(isComingSoon({ ...milestone, modules: ["P1"] }, ctx), true);
+  // One module still works as before.
+  assert.equal(meets({ id: "x", kind: "skill", rule: "pass", module: "F2" }, ctx, { completed: ["F2"] }), true);
+});
+
+// Developer milestones (quests/badges.yaml): a badge every two or three steps of a branch.
+const DEVELOPER_MILESTONES = ["first-run", "history-reader", "retry-wrangler", "count-keeper", "seat-holder", "trip-planner", "second-chance", "safe-shipper", "session-starter", "tool-fixer", "code-mode", "approver", "light-touch", "patient-gate", "time-traveler", "good-neighbor", "steady-partner"];
+
+test("a developer branch you can play awards a badge at least every three steps", () => {
+  // Read, not built (see above).
+  const quests = loadQuests();
+  const developer = loadBadges(quests).filter((b) => (b.personas ?? []).includes("developer"));
+  for (const branch of quests.branches.filter((b) => b.personas.includes("developer"))) {
+    const order = branch.modules.filter((id) => quests.modules.get(id).status === "ready");
+    if (!order.length) continue;
+    const awards = new Set();
+    for (const badge of developer) {
+      const need = (badge.kind === "tier" ? badge.modules : badge.modules ?? (badge.module ? [badge.module] : [])).filter((id) => order.includes(id));
+      if (need.length) awards.add(need.reduce((a, id) => (order.indexOf(id) > order.indexOf(a) ? id : a)));
+    }
+    let run = 0;
+    for (const id of order) {
+      run = awards.has(id) ? 0 : run + 1;
+      assert.ok(run < 3, `${branch.id}: three steps in a row up to ${id} with no badge`);
+    }
+  }
 });

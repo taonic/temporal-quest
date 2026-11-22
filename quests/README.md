@@ -9,6 +9,7 @@ quests/
   <branch>/<NN>x-<slug>/challenge.md  a challenge after module NN: its choices, run for real
   paths/<path>.yaml                  a path, and (for now) the exercises the site shows it as
   badges.yaml                        the skill badges
+  concepts.yaml                      the Temporal concepts modules teach (chips, and the map's Concept picker)
 ```
 
 The folder's `NN-` sets a module's order in its branch. Its `id` (`F2`, `A4`, `N3`) is what everything else uses: `requires`, the authoring markers, `./quest`, the site. An id is a stable label rather than a position: a module added later between A4 and A5 gets a new id, and nothing is renumbered.
@@ -30,7 +31,7 @@ classTitle: AI Agent Specialist   # its boss badge: at most 20 characters
 worker: uv run travel-worker      # its modules' default worker command
 agentUi: true                     # false: its modules have no Agent UI tab
 numbered: true                    # false: its learners see no module ids (Essentials), so its copy can't name one
-maxWords: 100                     # optional: each of the guide's messages is at most this many words (Essentials)
+maxWords: 100                     # optional: each of the guide's messages is at most this many words, not counting code (Essentials 100, Fundamentals 150)
 map: sketch                       # optional: its map is a sketchbook page (Essentials), each stop with its module's `emoji:` and `note:`
 welcome:                          # optional: a lean starting screen (Essentials): its goal, in two lines
   title: Things go wrong. Your process shouldn't.
@@ -74,6 +75,9 @@ title: A broken tool pauses the session
 teaser: Fix a broken tool while the conversation waits for it, and watch the conversation carry on.
 learn: A failing tool call retries while the conversation waits, so a fix lets it carry on.
                              # the map's "What you'll learn"; the teaser is its "What you'll do"
+concepts: [update, validator] # the Temporal concepts it teaches hands-on (concepts.yaml): chips on its
+                             # steps and its map card. A branch that tags one module tags them all, and
+                             # a module whose snippets use a concept's API (its `detect`) must list it.
 minutes: 6
 xp: 10                       # 10 hands-on, 5 for a quiz-only module
 tier: 1

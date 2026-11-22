@@ -1,8 +1,8 @@
 """Exercise 6 checks: timers, messages, child workflows, sagas, versioning and replay.
 
 Each test is one module's check (its `check.tests` in quests/fundamentals/): the hold's timer
-(F8), paying for it (F9), an itinerary's legs (F10), the booking saga (F11), a new step that old
-holds survive (F12), and replaying a history (F13).
+(F8), paying for it (F9), an itinerary's legs (F10), the booking saga (F11), a booking that waits
+for a new card (F14), a new step that old holds survive (F12), and replaying a history (F13).
 """
 
 import asyncio
@@ -11,7 +11,13 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import pytest
-from temporalio.client import Client, WorkflowFailureError, WorkflowHistory, WorkflowUpdateFailedError
+from temporalio.client import (
+    Client,
+    WorkflowExecutionStatus,
+    WorkflowFailureError,
+    WorkflowHistory,
+    WorkflowUpdateFailedError,
+)
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.worker import Replayer
 from temporalio.workflow import NondeterminismError
@@ -159,6 +165,70 @@ async def test_a_good_card_books_the_trip(env):
         history = await handle.fetch_history()
     assert result == "Booked FL-SFOJFK and HT-JFK, paid with the card ending 4242."
     assert activities_run(history) == ["reserve_flight", "reserve_hotel", "charge_card"], "nothing to undo"
+
+
+# --- F14: an expired card waits for a new one ----------------------------------------------------
+
+EXPIRED_HINT = (
+    "Is the TODO(ch06) above the except in hello/saga.py done? On a CardExpired error, set "
+    "self.waiting_for_new_card = True, wait_condition until it's False, and charge self.card."
+)
+UPDATE_HINT = "Is the TODO(ch06) for the new_card update and its validator in hello/saga.py done?"
+VALIDATOR_HINT = (
+    "The expired card was taken. Is the TODO(ch06) for the new_card update and its validator in "
+    "hello/saga.py done? The validator should turn away the card that expired."
+)
+
+
+async def book_with_an_expired_card(client, queue):
+    """Book with the expired card, and return once the booking waits for a new one."""
+    handle = await client.start_workflow(
+        BookTripWorkflow.run,
+        Booking(origin="SFO", destination="JFK", card="1111"),
+        id=f"book-test-{uuid.uuid4().hex[:4]}",
+        task_queue=queue,
+    )
+    for _ in range(50):
+        if (await handle.describe()).status != WorkflowExecutionStatus.RUNNING:
+            pytest.fail(f"An expired card ended the booking instead of waiting for a new one. {EXPIRED_HINT}")
+        if (await handle.query(BookTripWorkflow.status)).waiting_for_new_card:
+            return handle
+        await asyncio.sleep(0.2)
+    pytest.fail(f"The booking never started waiting for a new card. {EXPIRED_HINT}")
+
+
+async def test_an_expired_card_waits_for_a_new_one(env):
+    async with running(env) as (client, queue):
+        handle = await book_with_an_expired_card(client, queue)
+        try:
+            answer = await asyncio.wait_for(handle.execute_update("new_card", Payment(card="4242")), 10)
+        except Exception as err:  # noqa: BLE001 - any failure here is the same hint
+            pytest.fail(f"Sending the booking a new card didn't work. {UPDATE_HINT} ({err})")
+        assert answer == "Charging the card ending 4242."
+        result = await result_of(handle, f"The booking didn't finish once it had a new card. {EXPIRED_HINT}")
+        history = await handle.fetch_history()
+    assert result == "Booked FL-SFOJFK and HT-JFK, paid with the card ending 4242.", (
+        f"the booking should be paid with the new card, but it returned {result!r}: charge self.card after the wait"
+    )
+    assert activities_run(history) == ["reserve_flight", "reserve_hotel", "charge_card", "charge_card"], (
+        f"expected the card charged twice (the expired one, then the new one) and nothing undone, "
+        f"saw {activities_run(history)}"
+    )
+
+
+async def test_the_expired_card_is_turned_away(env):
+    async with running(env) as (client, queue):
+        handle = await book_with_an_expired_card(client, queue)
+        try:
+            await asyncio.wait_for(handle.execute_update("new_card", Payment(card="1111")), 10)
+        except WorkflowUpdateFailedError:
+            pass
+        else:
+            await handle.terminate("test done")
+            pytest.fail(VALIDATOR_HINT)
+        status = await handle.query(BookTripWorkflow.status)
+        await handle.terminate("test done")
+    assert status.waiting_for_new_card, "turning the expired card away should leave the booking waiting"
 
 
 # --- F12: versioning -----------------------------------------------------------------------------

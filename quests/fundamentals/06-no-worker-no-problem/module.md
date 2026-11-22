@@ -3,6 +3,7 @@ id: F6
 title: No worker? No problem
 teaser: "Start a workflow with no worker running, and watch it wait: recorded, and safe."
 learn: "Temporal holds a workflow's state, so a workflow with no worker waits safely."
+concepts: [task-queue]
 minutes: 4
 xp: 10
 tier: 1
