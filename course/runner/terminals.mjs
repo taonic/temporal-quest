@@ -5,7 +5,7 @@
 //
 // Browser protocol: text frames are JSON, {type: "input", data} or {type: "resize", cols,
 // rows}; the runner sends raw output as binary frames, and JSON for {type: "status", ...}.
-import { languageHome, sandboxLanguage } from "./sandboxes.mjs";
+import { languageHome, workingLanguage } from "./sandboxes.mjs";
 
 export const TERMINALS = ["worker", "commands"];
 const BUFFER_BYTES = 256 * 1024;
@@ -93,8 +93,9 @@ export class TerminalHub {
         }
         const handle = existing
           ? await proc.connectPty(term.name, { onData })
-          : // In the language's project: a TypeScript learner runs `npm run worker` there.
-            await proc.createPty({ id: term.name, cwd: languageHome(sandboxLanguage(term.sandbox)), cols, rows, envs: { TERM: "xterm-256color" }, onData });
+          : // In the project of the language the sandbox is used in: a TypeScript learner runs
+            // `npm run worker` there, a Python one (in any sandbox) `uv run hello-worker` in /workshop.
+            await proc.createPty({ id: term.name, cwd: languageHome(workingLanguage(term.sandbox)), cols, rows, envs: { TERM: "xterm-256color" }, onData });
         await handle.waitForConnection();
         if (existing) await handle.resize(cols, rows).catch(() => {});
         term.handle = handle;

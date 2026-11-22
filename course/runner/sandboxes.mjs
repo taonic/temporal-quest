@@ -23,6 +23,12 @@ export const LSP_PORTS = { python: LSP_PORT, typescript: 2088, dotnet: 2089 };
 export const languageHome = (language) => (language && language !== "python" ? `${sandboxRepo}/langs/${language}/hello` : sandboxRepo);
 // The language a sandbox was made for (its snapshot's): its label, Python before there were others.
 export const sandboxLanguage = (sandbox) => sandbox?.labels?.language ?? "python";
+// The language it's used in now: its own, or Python, which every language's snapshot has too (ADR
+// 0003). Its terminals open in that language's folder.
+export const workingLanguage = (sandbox) => sandbox?.labels?.works_in ?? sandboxLanguage(sandbox);
+// Whether a learner building in `language` can use this sandbox: one made for it, or for any
+// language when they build in Python. Another language needs that language's toolchain.
+export const fitsLanguage = (sandbox, language) => language === "python" || sandboxLanguage(sandbox) === language;
 // Each worker the poll can find: how pgrep finds it (bracketed, so pgrep doesn't match its own
 // command line), the name the page shows, and the command that starts it (the page compares a
 // worker ▶'s command with it). TypeScript's: `npm run worker` runs tsx on src/worker.ts. Java's:
@@ -215,14 +221,19 @@ export class SandboxManager {
     }
   }
 
-  async describe(learner) {
+  // `language`: the one the page builds in. A sandbox used in another isn't ready for it: the page
+  // then starts it, which switches it (to Python) or asks about a new one (another language).
+  async describe(learner, language = null) {
     if (this.inflight.has(learner)) return this.progress.get(learner);
     const failed = this.progress.get(learner);
     // Kept until the learner starts again: an error, no room, or a sandbox for another language.
     if (failed?.state === "error" || failed?.state === "full" || failed?.state === "language") return failed;
     const sandbox = await this.refreshed(learner);
     if (!sandbox) return { state: "none" };
-    if (sandbox.state === "started" && this.ready.has(sandbox.id)) return { state: "ready", sandboxId: sandbox.id };
+    if (sandbox.state === "started" && this.ready.has(sandbox.id)) {
+      if (language && workingLanguage(sandbox) !== language) return { state: "waking", sandboxId: sandbox.id };
+      return { state: "ready", sandboxId: sandbox.id };
+    }
     return { state: sandbox.state === "started" ? "waking" : sandbox.state, sandboxId: sandbox.id };
   }
 
@@ -275,7 +286,7 @@ export class SandboxManager {
     this.#stillWanted(run);
     let fresh = false;
 
-    if (sandbox && sandboxLanguage(sandbox) !== run.language) {
+    if (sandbox && !fitsLanguage(sandbox, run.language)) {
       // Made for another language: the learner chooses whether to start a new one (its code
       // goes; their progress stays), rather than having it deleted under them.
       const label = (id) => ({ python: "Python", typescript: "TypeScript", java: "Java", dotnet: "C#" })[id] ?? id;
@@ -317,6 +328,7 @@ export class SandboxManager {
     else await this.#writeEnv(sandbox, learner, origins, { onlyIfStale: true });
 
     this.#stillWanted(run);
+    if (workingLanguage(sandbox) !== run.language) await this.#switchLanguage(run, sandbox);
     this.ready.set(sandbox.id, Date.now());
     this.#step(run, "ready", "Your sandbox is ready.", { sandboxId: sandbox.id });
   }
@@ -445,8 +457,8 @@ export class SandboxManager {
       "rm -f .stack/*.pid",
       // An upload doesn't always keep a file's executable bit.
       "chmod +x quest",
-      // A sandbox for another language: ./quest works in it (its checks, its catch-up) from now on.
-      ...(sandboxLanguage(sandbox) === "python" ? [] : [`./quest lang ${sandboxLanguage(sandbox)}`]),
+      // ./quest works in the learner's language (its checks, its catch-up) from now on.
+      ...(run.language === "python" && sandboxLanguage(sandbox) === "python" ? [] : [`./quest lang ${run.language}`]),
       ...(fresh ? ["./quest starter"] : []),
       "uv run --frozen travel-stack up",
       `{ ${START_LSP}; }`,
@@ -457,6 +469,20 @@ export class SandboxManager {
       const tail = (result.result ?? "").trim().split("\n").slice(-15).join("\n");
       throw new Error(`Starting the workshop services failed:\n${tail}`);
     }
+  }
+
+  // The learner builds in another language than the one this sandbox is used in (Python, in a
+  // sandbox made for Java, say): ./quest works in it from now on, and the terminals, which opened
+  // in the old language's folder, close, so the next ones open in the new one's.
+  async #switchLanguage(run, sandbox) {
+    this.#step(run, "bootstrapping", "Switching your sandbox's language…", { sandboxId: sandbox.id });
+    const switched = await this.exec(sandbox, `./quest lang ${run.language}`, 60);
+    if (switched.exitCode !== 0) throw new Error(`Switching the language failed: ${(switched.result ?? "").trim().slice(-500)}`);
+    for (const pty of await sandbox.process.listPtySessions().catch(() => [])) {
+      await sandbox.process.killPtySession(pty.id).catch(() => {});
+    }
+    await sandbox.setLabels({ ...sandbox.labels, works_in: run.language });
+    this.onLanguageSwitch?.(sandbox.id);
   }
 
   // The upload adds and replaces files but deletes none, and the snapshot has the workshop as it

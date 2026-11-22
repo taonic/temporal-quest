@@ -372,11 +372,16 @@ export class Learner {
       await scroller.evaluate((el) => el.scrollBy(0, el.clientHeight * 0.8));
       await this.page.waitForTimeout(100);
     }
-    // The cursor is on it once the editor marks it the active line: a click during a scroll can miss.
+    // Always a click (the editor needs the focus for the keys below, even when its cursor is on
+    // the line already, as after an Insert), at the line's left edge (a long line's middle can be
+    // off screen), until the editor marks it the active line: a click during a scroll can miss.
     const active = this.page.locator(".cm-content .cm-activeLine", { hasText: text });
-    for (let i = 0; i < 5 && !(await active.count()); i++) {
+    for (let i = 0; i < 5; i++) {
       await line.scrollIntoViewIfNeeded();
-      await line.click();
+      // Scrolled sideways (after a long line), a line's left edge is under the line numbers.
+      await scroller.evaluate((el) => el.scrollTo({ left: 0 }));
+      await line.click({ position: { x: 4, y: 4 } });
+      if (await active.count()) break;
       await this.page.waitForTimeout(200);
     }
     await expect(active, `the cursor isn't on the line "${text}"`).toHaveCount(1);

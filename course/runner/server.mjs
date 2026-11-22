@@ -51,6 +51,8 @@ const races = new Races(db, { accounts, activity, manager });
 // a full field of 40, five tries each (a colour someone took, a pit-pass on a second device).
 const raceTries = new RateLimiter({ perKey: 200, global: 100_000, windowMs: 15 * 60_000 });
 const terminals = new TerminalHub(manager);
+// A sandbox now used in another language: its old terminals go (sandboxes.mjs #switchLanguage).
+manager.onLanguageSwitch = (sandboxId) => terminals.forget(sandboxId);
 const llm = createLlmPassthrough(config, { onCall: (learner) => activity.countModelCall(learner) });
 const distDir = config.distDir ? path.resolve(config.distDir) : null;
 
@@ -407,7 +409,8 @@ const routes = {
   "GET /api/sandbox": async (req, _res, url) => {
     const learner = requireLearner(req);
     manager.touch(learner, url.searchParams.get("exercise"));
-    return { ...(await manager.describe(learner)), allowance: allowanceOf(learner) };
+    const language = activity.catalog.knowsLanguage(url.searchParams.get("lang")) ? url.searchParams.get("lang") : null;
+    return { ...(await manager.describe(learner, language)), allowance: allowanceOf(learner) };
   },
 
   "POST /api/sandbox/start": async (req) => {

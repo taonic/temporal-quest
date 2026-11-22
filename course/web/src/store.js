@@ -611,7 +611,8 @@ async function pollSandbox() {
   clearTimeout(sandboxPoll);
   try {
     const exercise = store.route.page === "exercise" ? store.route.id : "";
-    applySandbox(await api(`/api/sandbox?exercise=${encodeURIComponent(exercise)}`));
+    // With the language this page builds in: a sandbox used in another one isn't ready for it yet.
+    applySandbox(await api(`/api/sandbox?exercise=${encodeURIComponent(exercise)}&lang=${encodeURIComponent(store.language.id)}`));
   } catch (err) {
     if (err.status === 401 || err.status === 403) refreshSession();
     // No status: the request never got an answer (the runner, or the network, is down).

@@ -432,10 +432,10 @@ test("the UI proxy's subdomain: served on the main port, and the cookie's domain
 
 test("a language's sandbox: its snapshot and label, its terminals' folder, its worker, and a learner on another language", async () => {
   const { languageHome, sandboxLanguage } = await import("../runner/sandboxes.mjs");
-  const manager = new SandboxManager({ maxSandboxes: 5, snapshot: "governance-course-py", languageSnapshots: { typescript: "governance-course-typescript-x" } });
+  const manager = new SandboxManager({ maxSandboxes: 5, snapshot: "governance-course-py", languageSnapshots: { typescript: "governance-course-typescript-x", java: "governance-course-java-x" } });
   assert.equal(manager.snapshotFor("python"), "governance-course-py");
   assert.equal(manager.snapshotFor("typescript"), "governance-course-typescript-x");
-  assert.equal(manager.snapshotFor("java"), null);
+  assert.equal(manager.snapshotFor("dotnet"), null);
   assert.equal(languageHome("typescript"), "/workshop/langs/typescript/hello");
   assert.equal(languageHome("python"), "/workshop");
   assert.equal(sandboxLanguage({ labels: { app: APP_LABEL, learner: "l" } }), "python");
@@ -452,12 +452,13 @@ test("a language's sandbox: its snapshot and label, its terminals' folder, its w
   assert.match(ran, /\[t\]sx src\/worker/);
   assert.deepEqual(out.worker, { running: true, name: "hello-worker", command: "npm run worker", env: { FLAKY: "1" } });
 
-  // A learner on Python whose sandbox is TypeScript's is asked, and the answer is kept.
+  // A learner on Java whose sandbox is TypeScript's is asked, and the answer is kept. (On Python,
+  // they'd use it: every language's snapshot has Python.)
   manager.refreshed = async () => ({ id: "sb", state: "started", labels: { language: "typescript" } });
-  manager.ensure("learner", {}, { language: "python" });
+  manager.ensure("learner", {}, { language: "java" });
   await manager.inflight.get("learner").promise;
   const state = await manager.describe("learner");
   assert.equal(state.state, "language");
   assert.equal(state.has, "typescript");
-  assert.match(state.message, /made for TypeScript, and you build in Python now/);
+  assert.match(state.message, /made for TypeScript, and you build in Java now/);
 });

@@ -17,7 +17,8 @@ RUN cd /workshop/langs/java/hello \
  && printf '#!/bin/sh\n# quest from anywhere: a language learner works in its project, not the workshop.\ncd /workshop && exec ./quest "$@"\n' > /usr/local/bin/quest \
  && chmod +x /usr/local/bin/quest \
  && chmod -R a+rwX /workshop/langs "$GRADLE_USER_HOME" \
- && sed -i 's#^cd /workshop$#cd /workshop/langs/java/hello#' /etc/bash.bashrc \
- && grep -q '^cd /workshop/langs/java/hello$' /etc/bash.bashrc
+ && sed -i 's#^cd /workshop$#case "$PWD" in /workshop*) ;; *) cd /workshop/langs/java/hello ;; esac#' /etc/bash.bashrc \
+ && grep -q 'cd /workshop/langs/java/hello ;; esac$' /etc/bash.bashrc
 # (The Python snapshot's bash.bashrc moves every shell to /workshop; a Java learner's terminals
-# open in its project instead.)
+# open in its project instead, unless the runner opened one elsewhere: in /workshop, for a learner who
+# switched to Python.)

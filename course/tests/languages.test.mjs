@@ -156,10 +156,10 @@ test("a persona or language left on a shared browser never becomes the next lear
 
 test("the runner keeps each learner's sandbox start, state and language to that learner", async () => {
   const { SandboxManager } = await import("../runner/sandboxes.mjs");
-  const manager = new SandboxManager({ maxSandboxes: 5, snapshot: "py", languageSnapshots: { typescript: "ts" } });
+  const manager = new SandboxManager({ maxSandboxes: 5, snapshot: "py", languageSnapshots: { typescript: "ts", java: "java" } });
   const sandboxes = { alice: { id: "sa", state: "started", labels: { language: "typescript" } }, bob: null };
   manager.refreshed = async (learner) => sandboxes[learner];
-  manager.ensure("alice", {}, { language: "python" }); // Alice's is TypeScript's: she's asked
+  manager.ensure("alice", {}, { language: "java" }); // Alice's is TypeScript's: she's asked
   manager.ensure("bob", {}, { language: "typescript" }); // Bob has none (and no Daytona here: his start fails)
   await manager.inflight.get("alice").promise;
   await manager.inflight.get("bob")?.promise.catch(() => {});
@@ -167,4 +167,26 @@ test("the runner keeps each learner's sandbox start, state and language to that 
   const bob = manager.progress.get("bob");
   assert.notEqual(bob?.state, "language", "Alice's answer isn't Bob's");
   assert.ok(!bob?.message?.includes("made for"), "nor is her message");
+});
+
+test("a learner who builds in Python can use any language's sandbox; another language needs its own", async () => {
+  const { fitsLanguage, workingLanguage } = await import("../runner/sandboxes.mjs");
+  const java = { labels: { language: "java" } };
+  assert.equal(fitsLanguage(java, "python"), true, "every language's snapshot has Python");
+  assert.equal(fitsLanguage(java, "java"), true);
+  assert.equal(fitsLanguage(java, "typescript"), false, "TypeScript needs Node: a new sandbox");
+  assert.equal(fitsLanguage({ labels: {} }, "java"), false, "Python's has no JDK");
+  // Its terminals open in the folder of the language it's used in now.
+  assert.equal(workingLanguage(java), "java");
+  assert.equal(workingLanguage({ labels: { language: "java", works_in: "python" } }), "python");
+});
+
+test("a ready sandbox used in another language isn't ready for a page in this one: the page starts it", async () => {
+  const { SandboxManager } = await import("../runner/sandboxes.mjs");
+  const manager = new SandboxManager({ maxSandboxes: 5, snapshot: "py", languageSnapshots: { java: "java" } });
+  manager.refreshed = async () => ({ id: "sj", state: "started", labels: { language: "java" } });
+  manager.ready.set("sj", Date.now());
+  assert.equal((await manager.describe("l", "java")).state, "ready");
+  assert.equal((await manager.describe("l", "python")).state, "waking", "switched to Python: the start switches it");
+  assert.equal((await manager.describe("l")).state, "ready", "a caller that doesn't say");
 });
