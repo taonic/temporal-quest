@@ -1,17 +1,18 @@
 <script setup>
-// The badge shelf (#/badges): a row per branch, its tier badges and then its boss badge (the
-// class title), and the skill badges below. Unearned badges show greyed, with what earns them:
-// there are no secret ones. An earned tier badge whose tier has grown since says so, and keeps it.
-// It closes (× or Esc) back to the page it was opened from, or the map.
-import { computed, onBeforeUnmount, onMounted } from "vue";
+// The badge shelf (#/badges): the branches' badges (each branch's tier badges, then its boss
+// badge, the class title) beside the skill badges (how you learn, and milestones), so both start
+// at the top of a wide screen; a narrow one stacks them, with a jump to each. Unearned badges show
+// greyed, with what earns them: there are no secret ones. It closes (× or Esc) back to the page it
+// was opened from, or the map.
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 
-import BadgeMedal from "../components/BadgeMedal.vue";
+import BadgeCard from "../components/BadgeCard.vue";
 import { iconSvg } from "../badgeArt.js";
-import { badgeComingSoon, badgeMissing, badges, earnedCount, isEarned, progress } from "../progress.js";
+import { badges, earnedCount, isEarned } from "../progress.js";
 import { cameFrom, course, navigate } from "../store.js";
 
-const rows = computed(() => [
-  ...course.branches
+const rows = computed(() =>
+  course.branches
     .map((branch) => ({
       key: branch.id,
       name: branch.name,
@@ -20,17 +21,30 @@ const rows = computed(() => [
       boss: badges.find((b) => b.branch === branch.id && b.kind === "boss") ?? null,
     }))
     .filter((row) => row.tiers.length || row.boss),
-  { key: "skills", name: "Skills", icon: iconSvg("bolt", 18), tiers: badges.filter((b) => b.kind === "skill"), boss: null, skills: true },
-]);
+);
+const branchBadges = computed(() => rows.value.flatMap((row) => [...row.tiers, ...(row.boss ? [row.boss] : [])]));
 
-const date = (at) => (at ? new Date(at).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "");
-function note(badge) {
-  if (isEarned(badge.id)) {
-    const grown = badgeMissing(badge).length;
-    return { earned: true, when: date(progress.badges[badge.id]), grown: grown ? `+${grown} new module${grown === 1 ? "" : "s"}` : "" };
-  }
-  return { earned: false, soon: badgeComingSoon(badge) };
+// Skill badges: those for how you learn (a rule across the course), and milestones (a module or
+// a few of them passed).
+const skills = computed(() => badges.filter((b) => b.kind === "skill"));
+const skillGroups = computed(() =>
+  [
+    { key: "how", name: "How you learn", badges: skills.value.filter((b) => b.rule !== "pass") },
+    { key: "milestones", name: "Milestones", badges: skills.value.filter((b) => b.rule === "pass") },
+  ].filter((group) => group.badges.length),
+);
+
+const earnedOf = (list) => list.filter((b) => isEarned(b.id)).length;
+const sections = computed(() => [
+  { key: "branches", name: "Tiers and class titles", list: branchBadges.value },
+  { key: "skills", name: "Skills", list: skills.value },
+]);
+const branchesEl = ref(null);
+const skillsEl = ref(null);
+function jump(key) {
+  (key === "skills" ? skillsEl : branchesEl).value?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
+
 function close() {
   const from = cameFrom();
   navigate(from && !from.startsWith("#/badges") ? from : "#/");
@@ -39,8 +53,6 @@ function close() {
 const onKey = (event) => event.key === "Escape" && !document.querySelector(".earn-backdrop, .modal-backdrop") && close();
 onMounted(() => window.addEventListener("keydown", onKey));
 onBeforeUnmount(() => window.removeEventListener("keydown", onKey));
-
-const kicker = (badge) => (badge.kind === "tier" ? `Tier ${badge.numeral} · ${badge.tierName}` : badge.kind === "boss" ? "Class title" : "");
 </script>
 
 <template>
@@ -50,25 +62,38 @@ const kicker = (badge) => (badge.kind === "tier" ? `Tier ${badge.numeral} · ${b
       <p class="panel-kicker">Your badges</p>
       <h1>{{ earnedCount }} of {{ badges.length }} earned</h1>
       <p class="badges-lede">A badge for every tier you finish and every boss you beat, which is your class title, and a few for how you learn. Badges you haven't earned yet say what earns them.</p>
+      <nav class="badges-jump" aria-label="Badge sections">
+        <button v-for="s in sections" :key="s.key" type="button" class="badges-jump-link" @click="jump(s.key)">
+          {{ s.name }} <span class="badges-jump-count">{{ earnedOf(s.list) }} of {{ s.list.length }}</span>
+        </button>
+      </nav>
     </header>
-    <section class="badges-shelf" aria-label="Badges">
-      <div v-for="row in rows" :key="row.key" class="badges-row" :class="{ 'is-skills': row.skills }">
-        <h2 class="badges-row-label"><span v-html="row.icon" />{{ row.name }}</h2>
-        <ul class="badges-row-items">
-          <template v-for="badge in [...row.tiers, ...(row.boss ? [row.boss] : [])]" :key="badge.id">
-            <li v-if="badge.kind === 'boss' && row.tiers.length" class="badges-divider" aria-hidden="true" />
-            <li class="badge-card" :class="{ 'is-locked': !note(badge).earned }" :data-badge="badge.id" :data-earned="note(badge).earned || null">
-              <BadgeMedal :badge="badge" :earned="note(badge).earned" :size="96" />
-              <p v-if="kicker(badge)" class="badge-card-kicker">{{ kicker(badge) }}</p>
-              <h3 class="badge-card-name">{{ badge.name }}</h3>
-              <p class="badge-card-criteria">{{ badge.criteria }}</p>
-              <p v-if="note(badge).earned" class="badge-card-when">Earned {{ note(badge).when }}</p>
-              <p v-else-if="note(badge).soon" class="badge-card-soon">Coming soon</p>
-              <p v-if="note(badge).grown" class="badge-card-grown" :title="`Still yours. The tier has ${note(badge).grown.slice(1)} since you earned it.`">{{ note(badge).grown }}</p>
-            </li>
-          </template>
-        </ul>
-      </div>
-    </section>
+    <div class="badges-layout">
+      <section ref="branchesEl" class="badges-shelf" aria-labelledby="badges-branches-title">
+        <h2 id="badges-branches-title" class="badges-section-title">
+          Tiers and class titles <span class="badges-jump-count">{{ earnedOf(branchBadges) }} of {{ branchBadges.length }}</span>
+        </h2>
+        <div v-for="row in rows" :key="row.key" class="badges-row">
+          <h3 class="badges-row-label"><span v-html="row.icon" />{{ row.name }}</h3>
+          <ul class="badges-row-items">
+            <template v-for="badge in [...row.tiers, ...(row.boss ? [row.boss] : [])]" :key="badge.id">
+              <li v-if="badge.kind === 'boss' && row.tiers.length" class="badges-divider" aria-hidden="true" />
+              <BadgeCard :badge="badge" :size="72" />
+            </template>
+          </ul>
+        </div>
+      </section>
+      <section ref="skillsEl" class="badges-shelf badges-skills" aria-labelledby="badges-skills-title">
+        <h2 id="badges-skills-title" class="badges-section-title">
+          Skills <span class="badges-jump-count">{{ earnedOf(skills) }} of {{ skills.length }}</span>
+        </h2>
+        <div v-for="group in skillGroups" :key="group.key" class="badges-row">
+          <h3 class="badges-row-label">{{ group.name }}</h3>
+          <ul class="badges-row-items">
+            <BadgeCard v-for="badge in group.badges" :key="badge.id" :badge="badge" :size="64" />
+          </ul>
+        </div>
+      </section>
+    </div>
   </main>
 </template>

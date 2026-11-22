@@ -7451,7 +7451,7 @@ a.menu-item {
 .badges-page {
   flex: 1;
   width: 100%;
-  max-width: 1080px;
+  max-width: 1280px;
   margin: 0 auto;
   padding: 28px 24px 56px;
 }
@@ -7489,24 +7489,77 @@ a.menu-item {
 
 .badges-lede {
   max-width: 640px;
-  margin: 6px 0 18px;
+  margin: 6px 0 12px;
   color: var(--muted);
   font-size: 14px;
+}
+
+/* Each section, with its count: a jump to it, for a screen that stacks them. */
+.badges-jump {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+
+.badges-jump-link {
+  padding: 5px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.badges-jump-link:hover,
+.badges-jump-link:focus-visible {
+  border-color: var(--line-strong);
+}
+
+.badges-jump-count {
+  margin-left: 4px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+/* The branches' badges beside the skills on a wide screen, so both start at the top. */
+.badges-layout {
+  display: grid;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (min-width: 900px) {
+  .badges-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .badges-jump {
+    display: none;
+  }
+}
+
+.badges-section-title {
+  margin: 14px 0 2px;
+  font-size: 15px;
+  font-weight: 800;
+  scroll-margin-top: 72px;
 }
 
 .badges-shelf {
   border: 1px solid var(--line);
   border-radius: 18px;
   background: var(--surface);
-  padding: 4px 20px;
+  padding: 4px 20px 6px;
+  scroll-margin-top: 72px;
 }
 
 .badges-row {
   display: grid;
-  grid-template-columns: 170px 1fr;
-  gap: 16px;
-  align-items: center;
-  padding: 16px 0;
+  gap: 10px;
+  padding: 12px 0 14px;
 }
 
 .badges-row + .badges-row {
@@ -7541,7 +7594,7 @@ a.menu-item {
 }
 
 .badge-card {
-  width: 128px;
+  width: 112px;
   text-align: center;
 }
 
@@ -7606,17 +7659,12 @@ a.menu-item {
     padding: 4px 12px;
   }
 
-  .badges-row {
-    grid-template-columns: 1fr;
-    gap: 10px;
-  }
-
   .badges-divider {
     display: none;
   }
 
   .badge-card {
-    width: calc(50% - 3px);
+    width: calc(50% - 3px) !important;
   }
 }
 
