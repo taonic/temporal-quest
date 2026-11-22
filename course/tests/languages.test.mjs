@@ -136,3 +136,35 @@ test("Ask Temporal writes examples in the learner's language", () => {
   assert.match(systemPrompt({ assignment: null, mode: "browser", language: "typescript" }), /doing the workshop in TypeScript/);
   assert.match(systemPrompt({ assignment: null, mode: "browser", language: "cobol" }), /doing the workshop in Python/);
 });
+
+test("a persona or language left on a shared browser never becomes the next learner's", async () => {
+  const { settleChoice } = await import("../web/src/choices.js");
+  const chose = { id: "typescript", chosen: true, fromUrl: false };
+  const defaulted = { id: "python", chosen: false, fromUrl: false };
+  // The server's is the learner's own, and wins.
+  assert.equal(settleChoice({ local: chose, server: "python", owner: "a@x.com", email: "a@x.com" }), "adopt");
+  assert.equal(settleChoice({ local: chose, server: "typescript", owner: "b@x.com", email: "a@x.com" }), "keep");
+  // Chosen here before anyone signed in, or by them: it goes up.
+  assert.equal(settleChoice({ local: chose, server: null, owner: null, email: "a@x.com" }), "upload");
+  assert.equal(settleChoice({ local: chose, server: null, owner: "a@x.com", email: "a@x.com" }), "upload");
+  // Chosen by someone else who signed in here: forgotten, not recorded as theirs.
+  assert.equal(settleChoice({ local: chose, server: null, owner: "b@x.com", email: "a@x.com" }), "reset");
+  // Nothing chosen: nothing to do. A link's ?lang= is this learner asking, now.
+  assert.equal(settleChoice({ local: defaulted, server: null, owner: "b@x.com", email: "a@x.com" }), "keep");
+  assert.equal(settleChoice({ local: { ...chose, fromUrl: true }, server: "python", owner: "b@x.com", email: "a@x.com" }), "upload");
+});
+
+test("the runner keeps each learner's sandbox start, state and language to that learner", async () => {
+  const { SandboxManager } = await import("../runner/sandboxes.mjs");
+  const manager = new SandboxManager({ maxSandboxes: 5, snapshot: "py", languageSnapshots: { typescript: "ts" } });
+  const sandboxes = { alice: { id: "sa", state: "started", labels: { language: "typescript" } }, bob: null };
+  manager.refreshed = async (learner) => sandboxes[learner];
+  manager.ensure("alice", {}, { language: "python" }); // Alice's is TypeScript's: she's asked
+  manager.ensure("bob", {}, { language: "typescript" }); // Bob has none (and no Daytona here: his start fails)
+  await manager.inflight.get("alice").promise;
+  await manager.inflight.get("bob")?.promise.catch(() => {});
+  assert.equal((await manager.describe("alice")).state, "language");
+  const bob = manager.progress.get("bob");
+  assert.notEqual(bob?.state, "language", "Alice's answer isn't Bob's");
+  assert.ok(!bob?.message?.includes("made for"), "nor is her message");
+});

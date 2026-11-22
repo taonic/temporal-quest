@@ -14,9 +14,10 @@ import { computed, reactive, watch } from "vue";
 import { badgeContext, earnedNow, isComingSoon, missingFor as badgeMissingFor } from "./badges.js";
 import { addPick, xpFor } from "./challenge.js";
 import { QUESTION_XP, quizXp } from "./race/rules.js";
+import { settleChoice } from "./choices.js";
 import { keepLanguage, moduleLanguage } from "./language.js";
 import { keepPersona } from "./persona.js";
-import { api, course, fullCourse, load, save, store } from "./store.js";
+import { api, course, fullCourse, load, save, storageKey, store } from "./store.js";
 
 export const LEVEL_XP = 50;
 
@@ -155,14 +156,18 @@ async function syncFromServer() {
     save("progress-owner", email);
     if (!pathFromUrl) progress.path = course.paths.some((p) => p.id === server.path) ? server.path : null;
     else if (server.path !== progress.path) track("path_set", null, { path: progress.path });
-    // The persona follows the learner: the server's (their choice, or their cohort's) wins, unless
-    // this page's URL set one; one chosen here before signing in goes up.
-    if (server.persona && server.persona !== store.persona.id && !store.persona.fromUrl) choosePersona(server.persona, { record: false });
-    else if (store.persona.chosen && server.persona !== store.persona.id) track("persona_set", null, { persona: store.persona.id });
-    // The language too: theirs (or their cohort's) wins, unless this page's URL set one.
-    const offered = (course.languages ?? []).some((l) => l.id === server.language);
-    if (offered && server.language !== store.language.id && !store.language.fromUrl) chooseLanguage(server.language, { record: false });
-    else if (store.language.chosen && server.language !== store.language.id) track("language_set", null, { language: store.language.id });
+    // The persona and the language follow the learner (choices.js): theirs (or their cohort's)
+    // wins, unless this page's URL set one; one chosen here goes up only if it's theirs, and one
+    // another learner left on this browser is forgotten.
+    const personaIs = course.personas.some((p) => p.id === server.persona) ? server.persona : null;
+    const personaDoes = settleChoice({ local: store.persona, server: personaIs, owner, email });
+    const languageIs = (course.languages ?? []).some((l) => l.id === server.language) ? server.language : null;
+    const languageDoes = settleChoice({ local: store.language, server: languageIs, owner, email });
+    if (personaDoes === "upload") track("persona_set", null, { persona: store.persona.id });
+    if (languageDoes === "upload") track("language_set", null, { language: store.language.id });
+    if (personaDoes === "reset" || languageDoes === "reset") forgetChoices({ persona: personaDoes === "reset", language: languageDoes === "reset" });
+    else if (personaDoes === "adopt") choosePersona(personaIs, { record: false });
+    else if (languageDoes === "adopt") chooseLanguage(languageIs, { record: false });
     const passed = { ...(mine ? progress.passedIn : {}) };
     for (const [id, langs] of Object.entries(server.passedIn ?? {})) passed[id] = [...new Set([...(passed[id] ?? []), ...langs])];
     progress.passedIn = passed;
@@ -439,6 +444,18 @@ watch(
     passIfChecked(id);
   },
 );
+
+// Another learner's persona or language, left on this browser: forgotten, and the page loads again
+// as this learner's (their own choice from the server, or the site asks).
+function forgetChoices({ persona, language }) {
+  try {
+    if (persona) localStorage.removeItem(storageKey("persona"));
+    if (language) localStorage.removeItem(storageKey("language"));
+  } catch {
+    /* storage unavailable: nothing was kept */
+  }
+  window.location.reload();
+}
 
 // The learner's language: kept (and recorded, while signed in). The course in another language
 // is worked out as the page loads, so it loads again, where it was.
