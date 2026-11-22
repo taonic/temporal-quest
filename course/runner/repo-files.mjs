@@ -15,12 +15,13 @@ export const sandboxRepo = "/workshop";
 const FILES = ["pyproject.toml", "uv.lock", "agents.toml", "README.md", "DESIGN.md", ".env.example", ".gitignore", "quest"];
 export const WORKSHOP_DIRS = [
   "hello", "codemode", "travel_agent", "concierge", "essentials", "policies", "quests", "scripts", "tests",
-  "authoring", "starter", "docs",
+  "authoring", "starter", "docs", "langs",
 ];
 // The folders kept current in every sandbox, not only a new one: no learner edits them, so a
 // sandbox made before they existed or changed gets them again (SandboxManager #keepCurrent).
 export const KEPT_CURRENT = ["essentials"];
-const SKIP = /(^|\/)(__pycache__|\.DS_Store|\.pytest_cache|\.ruff_cache)(\/|$)|\.pyc$/;
+// Caches, and a language's installed packages and build output (its snapshot has its own).
+const SKIP = /(^|\/)(__pycache__|\.DS_Store|\.pytest_cache|\.ruff_cache|node_modules|\.gradle)(\/|$)|^langs\/[^/]+\/[^/]+\/(build|bin|obj|lib)\/|\.pyc$|\.tsbuildinfo$/;
 
 // Repo-relative paths of every file a sandbox gets, sorted.
 export function workshopFiles(root = repoRoot) {
@@ -72,4 +73,24 @@ export function snapshotName(root = repoRoot) {
     hash.update(fs.readFileSync(path.join(root, file)));
   }
   return `governance-course-${hash.digest("hex").slice(0, 12)}`;
+}
+
+// A language's snapshot (course/snapshot/build-language.mjs): today's Python one, with that
+// language's toolchain, its hello's packages and a warm build on top. Its name carries a hash of
+// the Python snapshot's inputs and its own (its Dockerfile, the builder, which sizes it, and its
+// hello's package files), so either changing asks for a new one. Python's own name is unchanged.
+export const LANGUAGE_SNAPSHOT_INPUTS = {
+  typescript: ["langs/typescript/hello/package.json", "langs/typescript/hello/package-lock.json"],
+};
+
+export function languageSnapshotName(language, root = repoRoot) {
+  if (language === "python") return snapshotName(root);
+  if (!LANGUAGE_SNAPSHOT_INPUTS[language]) throw new Error(`no snapshot for ${language} yet (LANGUAGE_SNAPSHOT_INPUTS)`);
+  const hash = crypto.createHash("sha256");
+  const files = [...SNAPSHOT_INPUTS, `course/snapshot/languages/${language}.Dockerfile`, "course/snapshot/languages/lsp_stdio_bridge.py", "course/snapshot/build-language.mjs", ...LANGUAGE_SNAPSHOT_INPUTS[language]];
+  for (const file of files) {
+    hash.update(`${file}\0`);
+    hash.update(fs.readFileSync(path.join(root, file)));
+  }
+  return `governance-course-${language}-${hash.digest("hex").slice(0, 12)}`;
 }

@@ -13,7 +13,8 @@
     "start": "node runner/server.mjs",
     "snapshot": "node snapshot/build.mjs",
     "test": "node --test \"tests/*.test.mjs\"",
-    "deploy": "cd .. && fly deploy . --config course/fly.toml --dockerfile course/Dockerfile --ignorefile course/.dockerignore --ha=false"
+    "deploy": "cd .. && fly deploy . --config course/fly.toml --dockerfile course/Dockerfile --ignorefile course/.dockerignore --ha=false",
+    "snapshot:language": "node snapshot/build-language.mjs"
   },
   "dependencies": {
     "@codemirror/lang-java": "^6.0.2",

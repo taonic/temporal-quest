@@ -9,7 +9,7 @@
 // the LSP handshake then, rather than timing out its initialize request meanwhile.
 import WebSocket from "ws";
 
-import { LSP_PORT } from "./sandboxes.mjs";
+import { LSP_PORTS } from "./sandboxes.mjs";
 
 const CONNECT_TIMEOUT_MS = 10_000;
 const ATTEMPTS = 5;
@@ -34,8 +34,8 @@ function open(url) {
 }
 
 // Connects to the bridge, starting it if it isn't answering (it may have exited on its own).
-async function connect(manager, learner) {
-  const url = (await manager.previewFor(learner, LSP_PORT)).replace(/^http/, "ws");
+async function connect(manager, learner, language) {
+  const url = (await manager.previewFor(learner, LSP_PORTS[language] ?? LSP_PORTS.python)).replace(/^http/, "ws");
   let lastError;
   for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
     try {
@@ -49,7 +49,8 @@ async function connect(manager, learner) {
   throw new Error(`The language server isn't answering (${lastError?.message}).`);
 }
 
-export async function relayLsp(manager, learner, ws) {
+// `language`: whose language server (Python's, unless the page asks for another's).
+export async function relayLsp(manager, learner, ws, language = "python") {
   const waiting = [];
   let upstream = null;
   let closed = false;
@@ -64,7 +65,7 @@ export async function relayLsp(manager, learner, ws) {
     upstream?.close();
   });
 
-  upstream = await connect(manager, learner);
+  upstream = await connect(manager, learner, language);
   if (closed) return upstream.close();
   for (const message of waiting.splice(0)) upstream.send(message);
   ws.send(JSON.stringify({ jsonrpc: "2.0", method: READY }));

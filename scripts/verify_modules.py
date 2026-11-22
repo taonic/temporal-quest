@@ -38,7 +38,10 @@ def build(solved: set[str]) -> Path:
     tmp = Path(tempfile.mkdtemp(prefix="quest-verify-"))
     for name in COPY:
         if (ROOT / name).exists():
-            shutil.copytree(ROOT / name, tmp / name, ignore=shutil.ignore_patterns("__pycache__"))
+            # A language's installed packages are linked, not copied: they're big, and never change.
+            shutil.copytree(ROOT / name, tmp / name, ignore=shutil.ignore_patterns("__pycache__", "node_modules"))
+    for modules_dir in (ROOT / "langs").glob("*/*/node_modules"):
+        (tmp / modules_dir.relative_to(ROOT)).symlink_to(modules_dir)
     for name in ["pyproject.toml", "agents.toml"]:
         shutil.copy(ROOT / name, tmp / name)
     for path, content in outputs(solved, tmp).items():

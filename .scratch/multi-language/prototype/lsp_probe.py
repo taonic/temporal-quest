@@ -84,7 +84,9 @@ text = path.read_text()
 line_no = next(i for i, line in enumerate(text.splitlines()) if symbol in line)
 char = text.splitlines()[line_no].index(symbol) + 1
 uri = path.as_uri()
+# LSP_INIT: JSON initializationOptions (typescript-language-server's maxTsServerMemory, say).
 init = request(1, "initialize", {"processId": os.getpid(), "rootUri": root.as_uri(),
+                                 "initializationOptions": json.loads(os.environ.get("LSP_INIT", "{}")),
                                  "workspaceFolders": [{"uri": root.as_uri(), "name": root.name}],
                                  "capabilities": {"textDocument": {"hover": {"contentFormat": ["markdown", "plaintext"]}}}}, TIMEOUT)
 send({"jsonrpc": "2.0", "method": "initialized", "params": {}})
@@ -105,5 +107,9 @@ elapsed = time.monotonic() - start
 print(f"hover: {elapsed:.1f}s ({'answered' if hover else 'no answer'})")
 print(f"hover text: {json.dumps(hover)[:300]}")
 time.sleep(5)
-print(f"tree RSS after hover: {tree_rss_mb(proc.pid)} MB")
+print(f"tree RSS after hover: {tree_rss_mb(proc.pid)} MB", flush=True)
+# LSP_HOLD: keep the server open that many seconds more (a check runs beside it), noting its size.
+for _ in range(int(os.environ.get("LSP_HOLD", "0")) // 5):
+    time.sleep(5)
+    print(f"tree RSS: {tree_rss_mb(proc.pid)} MB", flush=True)
 proc.kill()

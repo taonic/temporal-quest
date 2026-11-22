@@ -1,0 +1,24 @@
+// The workflow: a durable function that describes a trip. Workflow code must be deterministic:
+// Temporal may replay it from its history at any time, on any worker. So it never touches the
+// outside world itself. It asks for that through activities, and Temporal records each result.
+import { proxyActivities } from '@temporalio/workflow';
+import type * as activities from './activities';
+import type { Airport, TripRequest } from './shared';
+
+export async function HelloTripWorkflow(trip: TripRequest): Promise<string> {
+  const origin = await airport(trip.origin);
+  const destination = await airport(trip.destination);
+  return `Your trip: ${origin.city} (${origin.code}) to ${destination.city} (${destination.code}).`;
+}
+
+async function airport(code: string): Promise<Airport> {
+  // Ask Temporal to run the activity. Its result is recorded in the workflow's history,
+  // so a replay reuses the result instead of running the activity again.
+  const { lookup_airport } = proxyActivities<typeof activities>({
+    // How long one attempt may take before Temporal times it out and tries again.
+    startToCloseTimeout: '10 seconds',
+    // Failed attempts are retried for you: wait 2s, then twice as long each time, up to 6s.
+    retry: { initialInterval: '2 seconds', backoffCoefficient: 2, maximumInterval: '6 seconds' },
+  });
+  return await lookup_airport(code);
+}

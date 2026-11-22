@@ -63,6 +63,8 @@ Editing a module, the README, `starter/` or `authoring/` regenerates the content
 
 **The snapshot.** Sandboxes start from a Daytona snapshot named after a hash of its inputs (`pyproject.toml`, `uv.lock`, `scripts/setup_dogwood.sh`, `snapshot/Dockerfile`, `snapshot/lsp_bridge.py`, and `snapshot/build.mjs`, whose `RESOURCES` size each sandbox: 1 vCPU, 2 GiB, 5 GiB disk). When any of them changes, build the new one: `npm run snapshot` (it compiles Dogwood, so a few minutes). `node snapshot/build.mjs --name` prints the name the runner will ask for; `--local` builds the image with local Docker instead.
 
+**A language's snapshot** (TypeScript's so far) is Python's with that language's toolchain on top: `snapshot/languages/typescript.Dockerfile` adds Node, the TypeScript hello's packages, typescript-language-server (its bridge is `snapshot/languages/lsp_stdio_bridge.py`, on port 2088) and `quest` on the PATH. Build it with `npm run snapshot:language -- typescript` (`--name`, `--local` as above); its name hashes Python's inputs and its own (`LANGUAGE_SNAPSHOT_INPUTS` in `runner/repo-files.mjs`), and `SANDBOX_SNAPSHOT_TYPESCRIPT` overrides it. A learner's sandbox starts from their language's snapshot (labelled `language`), its terminals open in the language's project, and a learner whose sandbox is another language's is offered a new one.
+
 ## Writing for both modes
 
 The modules in `quests/` ([quests/README.md](../quests/README.md)) are the source for GitHub and both modes of the site. Text that only applies in the browser goes inside an HTML comment, so GitHub never shows it:

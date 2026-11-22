@@ -5,7 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { uiSubdomain } from "./auth.mjs";
-import { snapshotName } from "./repo-files.mjs";
+import { LANGUAGE_SNAPSHOT_INPUTS, languageSnapshotName, snapshotName } from "./repo-files.mjs";
 
 const env = process.env;
 const LOOPBACK = /^(?:127(?:\.\d{1,3}){3}|localhost|::1|\[::1\])$/i;
@@ -57,6 +57,10 @@ export const config = {
 
   daytonaApiKey: env.DAYTONA_API_KEY || env.DAYTONA_KEY || "",
   snapshot: env.SANDBOX_SNAPSHOT || snapshotName(),
+  // Each other language's snapshot (course/snapshot/build-language.mjs): SANDBOX_SNAPSHOT_TYPESCRIPT…
+  languageSnapshots: Object.fromEntries(
+    Object.keys(LANGUAGE_SNAPSHOT_INPUTS).map((language) => [language, env[`SANDBOX_SNAPSHOT_${language.toUpperCase()}`] || languageSnapshotName(language)]),
+  ),
   maxSandboxes: int("MAX_SANDBOXES", 40),
   autoStopMinutes: int("SANDBOX_AUTO_STOP_MINUTES", 30),
   ttlMinutes: int("SANDBOX_TTL_MINUTES", 24 * 60),

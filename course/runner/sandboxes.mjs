@@ -16,6 +16,24 @@ export const APP_LABEL = "governance-course";
 export const CONSOLE_PORT = 8000;
 export const TEMPORAL_UI_PORT = 8233;
 export const LSP_PORT = 2087;
+// The language servers' bridges, by language: Python's (jedi) on LSP_PORT, and each other
+// language's (course/snapshot/languages/lsp_stdio_bridge.py), in its snapshot.
+export const LSP_PORTS = { python: LSP_PORT, typescript: 2088 };
+// Where a language's learners work: its terminals open there. Python's is the workshop itself.
+export const languageHome = (language) => (language && language !== "python" ? `${sandboxRepo}/langs/${language}/hello` : sandboxRepo);
+// The language a sandbox was made for (its snapshot's): its label, Python before there were others.
+export const sandboxLanguage = (sandbox) => sandbox?.labels?.language ?? "python";
+// Each worker the poll can find: how pgrep finds it (bracketed, so pgrep doesn't match its own
+// command line), the name the page shows, and the command that starts it (the page compares a
+// worker ▶'s command with it). TypeScript's: `npm run worker` runs tsx on src/worker.ts.
+const WORKERS = [
+  { pattern: "[h]ello-worker", name: "hello-worker", command: "uv run hello-worker" },
+  { pattern: "[t]ravel-worker", name: "travel-worker", command: "uv run travel-worker" },
+  { pattern: "[t]sx src/worker", name: "hello-worker", command: "npm run worker" },
+];
+const WORKER_PATTERN = WORKERS.map((w) => w.pattern).join("|");
+// A trip's starter, still waiting for its trip in the commands terminal.
+const STARTER_PATTERN = "[h]ello-start|[t]sx src/starter";
 const RUNNING = new Set(["started", "starting", "creating", "restoring", "pulling_snapshot", "resuming"]);
 const GONE = new Set(["destroyed", "destroying", "error", "build_failed"]);
 const BOOTSTRAPPED = ".course/bootstrapped";
@@ -46,9 +64,14 @@ export function isSafePath(rel) {
 // answers. setsid -f puts it in a session of its own and returns at once: Daytona ends the
 // command's process group when it returns, which would take a plain `&` job with it. (Not
 // pgrep: this very command line names the script.)
+// A language's snapshot has its own bridge too (TypeScript's: typescript-language-server, its
+// tsserver capped at 512 MB as a guard), started the same way when it's there.
 const START_LSP =
-  `(: </dev/tcp/127.0.0.1/${LSP_PORT}) 2>/dev/null || ` +
-  `setsid -f /opt/lsp/bin/python /opt/lsp/lsp_bridge.py --port ${LSP_PORT} >/tmp/lsp-bridge.log 2>&1 </dev/null`;
+  `{ (: </dev/tcp/127.0.0.1/${LSP_PORT}) 2>/dev/null || ` +
+  `setsid -f /opt/lsp/bin/python /opt/lsp/lsp_bridge.py --port ${LSP_PORT} >/tmp/lsp-bridge.log 2>&1 </dev/null; }; ` +
+  `if command -v typescript-language-server >/dev/null && ! (: </dev/tcp/127.0.0.1/${LSP_PORTS.typescript}) 2>/dev/null; then ` +
+  `setsid -f /opt/lsp/bin/python /opt/lsp/lsp_stdio_bridge.py --port ${LSP_PORTS.typescript} --cwd ${languageHome("typescript")} ` +
+  `--init '{"maxTsServerMemory": 512}' -- typescript-language-server --stdio >/tmp/lsp-bridge-typescript.log 2>&1 </dev/null; fi`;
 
 // A challenge run's name (FC1-B), checked: it goes into a shell command and a file name.
 export function challengeRun(id, choice) {
@@ -189,7 +212,8 @@ export class SandboxManager {
   async describe(learner) {
     if (this.inflight.has(learner)) return this.progress.get(learner);
     const failed = this.progress.get(learner);
-    if (failed?.state === "error" || failed?.state === "full") return failed;
+    // Kept until the learner starts again: an error, no room, or a sandbox for another language.
+    if (failed?.state === "error" || failed?.state === "full" || failed?.state === "language") return failed;
     const sandbox = await this.refreshed(learner);
     if (!sandbox) return { state: "none" };
     if (sandbox.state === "started" && this.ready.has(sandbox.id)) return { state: "ready", sandboxId: sandbox.id };
@@ -208,9 +232,10 @@ export class SandboxManager {
 
   // Gets the learner's sandbox to "ready", creating or starting it as needed. Concurrent
   // calls share one run; reset() cancels it, so a run that's stuck can be left behind.
-  ensure(learner, origins) {
+  // `language`: the one the learner builds in, whose snapshot a new sandbox starts from.
+  ensure(learner, origins, { language = "python" } = {}) {
     if (!this.inflight.has(learner)) {
-      const run = { learner, cancelled: false };
+      const run = { learner, cancelled: false, language: this.snapshotFor(language) ? language : "python" };
       const promise = this.#ensure(run, origins)
         .catch((err) => {
           if (!run.cancelled && this.progress.get(learner)?.state !== "full") this.#step(run, "error", err.message);
@@ -221,6 +246,11 @@ export class SandboxManager {
       this.inflight.set(learner, { run, promise });
     }
     return this.progress.get(learner) ?? { state: "finding", message: "Looking for your sandbox…" };
+  }
+
+  // The snapshot a language's sandboxes start from (null: none for it).
+  snapshotFor(language) {
+    return language === "python" ? this.config.snapshot : (this.config.languageSnapshots?.[language] ?? null);
   }
 
   // Only the learner's current run reports progress.
@@ -239,6 +269,18 @@ export class SandboxManager {
     this.#stillWanted(run);
     let fresh = false;
 
+    if (sandbox && sandboxLanguage(sandbox) !== run.language) {
+      // Made for another language: the learner chooses whether to start a new one (its code
+      // goes; their progress stays), rather than having it deleted under them.
+      const label = (id) => ({ python: "Python", typescript: "TypeScript", java: "Java", dotnet: "C#" })[id] ?? id;
+      this.#step(
+        run,
+        "language",
+        `Your sandbox was made for ${label(sandboxLanguage(sandbox))}, and you build in ${label(run.language)} now. A new sandbox for ${label(run.language)} takes about a minute: your progress stays, the code in this one goes.`,
+        { sandboxId: sandbox.id, has: sandboxLanguage(sandbox), wants: run.language },
+      );
+      return;
+    }
     if (!sandbox) {
       sandbox = await this.#create(run);
       fresh = true;
@@ -291,8 +333,8 @@ export class SandboxManager {
       const sandbox = await withTimeout(
         this.daytona.create(
           {
-            snapshot: this.config.snapshot,
-            labels: { app: APP_LABEL, learner },
+            snapshot: this.snapshotFor(run.language),
+            labels: { app: APP_LABEL, learner, ...(run.language === "python" ? {} : { language: run.language }) },
             autoStopInterval: this.config.autoStopMinutes,
             ttlMinutes: this.config.ttlMinutes,
           },
@@ -483,10 +525,10 @@ export class SandboxManager {
       sandbox,
       `${mark}${stat}echo '--passed'; ls .course/passed 2>/dev/null; echo '--mode'; grep -m1 '^LLM_MODE=' .env 2>/dev/null; ` +
         // Bracketed so pgrep doesn't match this command's own line.
-        `echo '--worker'; pgrep -af '[h]ello-worker|[t]ravel-worker' 2>/dev/null | head -5; ` +
+        `echo '--worker'; pgrep -af '${WORKER_PATTERN}' 2>/dev/null | head -5; ` +
         // The settings a worker command can start it with (FLAKY=1 uv run hello-worker), from
         // the running worker's environment, so the page knows which of its ▶s is running.
-        `echo '--workerenv'; p=$(pgrep -f '[h]ello-worker|[t]ravel-worker' 2>/dev/null | head -1); ` +
+        `echo '--workerenv'; p=$(pgrep -f '${WORKER_PATTERN}' 2>/dev/null | head -1); ` +
         `[ -n "$p" ] && tr '\\0' '\\n' < /proc/$p/environ 2>/dev/null | grep -E '^(${WORKER_ENV.join("|")})='; ` +
         // The runner rewrote .env since: a travel worker running now has the old model address.
         // Reported once (ps's process ages aren't to be trusted in these sandboxes).
@@ -495,7 +537,7 @@ export class SandboxManager {
         `echo '--caughtup'; echo "\${CAUGHT_UP:-}"` +
         (trips
           ? `; echo '--trips'; timeout 5 temporal workflow list --query "WorkflowType IN ('HelloTripWorkflow', 'BoardingWorkflow', 'FareHoldWorkflow', 'ItineraryWorkflow', 'BookTripWorkflow')" --limit 30 -o jsonl 2>/dev/null` +
-            `; echo '--starter'; pgrep -af '[h]ello-start' 2>/dev/null | head -3`
+            `; echo '--starter'; pgrep -af '${STARTER_PATTERN}' 2>/dev/null | head -3`
           : "") +
         (board ? `; echo '--board'; timeout 10 ${BOARD} state 2>/dev/null` : ""),
       15,
@@ -520,8 +562,8 @@ export class SandboxManager {
         out.files[name] = { mtime: Number(mtime), size: Number(size) };
       } else if (section === "passed") out.passed.push(line.trim());
       else if (section === "worker") {
-        const name = line.match(/\b(hello|travel)-worker\b/)?.[1];
-        if (name) out.worker = { ...out.worker, running: true, name: `${name}-worker` };
+        const found = WORKERS.find((w) => new RegExp(w.pattern.replace(/\[(.)\]/, "$1")).test(line));
+        if (found && !out.worker.running) out.worker = { ...out.worker, running: true, name: found.name, command: found.command };
       } else if (section === "workerenv") {
         const [, key, value] = line.match(/^(\w+)=(.*)$/) ?? [];
         if (key) out.worker.env[key] = value;

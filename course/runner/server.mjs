@@ -418,8 +418,11 @@ const routes = {
       throw Object.assign(new Error(`You've used today's ${Math.round(allowance.limitMinutes / 60)} hours of sandbox time.`), { status: 429, code: "allowance", freesAt: at });
     }
     manager.clearError(learner);
+    // The language they build in (the page's), whose snapshot a new sandbox starts from.
+    const body = await readJson(req).catch(() => ({}));
+    const language = activity.catalog.knowsLanguage(body?.language) ? body.language : "python";
     const wasCreating = !(await manager.find(learner).catch(() => null));
-    const result = manager.ensure(learner, origins(req));
+    const result = manager.ensure(learner, origins(req), { language });
     if (wasCreating) activity.record(learner, "sandbox_create", null, null);
     return result;
   },
@@ -587,7 +590,7 @@ server.on("upgrade", async (req, socket, head) => {
     const ping = setInterval(() => ws.readyState === ws.OPEN && ws.ping(), 25_000);
     ws.on("close", () => clearInterval(ping));
     if (lsp) {
-      relayLsp(manager, learner, ws).catch((err) => {
+      relayLsp(manager, learner, ws, url.searchParams.get("lang") === "typescript" ? "typescript" : "python").catch((err) => {
         log(`language server relay failed: ${err.message}`);
         if (ws.readyState === ws.OPEN) ws.close(4001, "unavailable");
       });

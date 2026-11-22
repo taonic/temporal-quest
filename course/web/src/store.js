@@ -426,6 +426,7 @@ export function sandboxStartView() {
   if (store.authenticated && SANDBOX_BUSY[state]) return { state: "busy", label: SANDBOX_BUSY[state], disabled: true };
   if (store.authenticated && state === "allowance") return { state: "error", label: "Out of sandbox time", disabled: true };
   if (store.authenticated && (state === "error" || state === "full")) return { state: "error", label: "Try again", disabled: false };
+  if (store.authenticated && state === "language") return { state: "error", label: "Start a new sandbox", disabled: false };
   return { state: "idle", label: "Start my sandbox", disabled: false };
 }
 
@@ -627,8 +628,10 @@ export async function startSandbox() {
     return;
   }
   store.sandboxLost = false;
+  // Made for another language: its button starts a new one in theirs (the learner chose to).
+  if (store.sandbox.state === "language") return resetSandbox({ restart: true });
   try {
-    applySandbox(await api("/api/sandbox/start", { method: "POST" }));
+    applySandbox(await api("/api/sandbox/start", { method: "POST", body: { language: store.language.id } }));
   } catch (err) {
     // Out of sandbox time: say when it frees up.
     const message = err.code === "allowance" && err.freesAt ? `${err.message} It frees up at ${clockTime(Date.parse(err.freesAt))}.` : err.message;

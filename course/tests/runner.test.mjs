@@ -429,3 +429,35 @@ test("the UI proxy's subdomain: served on the main port, and the cookie's domain
   assert.deepEqual(uiSubdomain("https://ui.temporalquest.dev", ""), none);
   assert.deepEqual(uiSubdomain("not a url", "https://temporalquest.dev"), none);
 });
+
+test("a language's sandbox: its snapshot and label, its terminals' folder, its worker, and a learner on another language", async () => {
+  const { languageHome, sandboxLanguage } = await import("../runner/sandboxes.mjs");
+  const manager = new SandboxManager({ maxSandboxes: 5, snapshot: "governance-course-py", languageSnapshots: { typescript: "governance-course-typescript-x" } });
+  assert.equal(manager.snapshotFor("python"), "governance-course-py");
+  assert.equal(manager.snapshotFor("typescript"), "governance-course-typescript-x");
+  assert.equal(manager.snapshotFor("java"), null);
+  assert.equal(languageHome("typescript"), "/workshop/langs/typescript/hello");
+  assert.equal(languageHome("python"), "/workshop");
+  assert.equal(sandboxLanguage({ labels: { app: APP_LABEL, learner: "l" } }), "python");
+  assert.equal(sandboxLanguage({ labels: { language: "typescript" } }), "typescript");
+
+  // The poll finds TypeScript's worker (`npm run worker` runs tsx on src/worker.ts), and says so.
+  manager.sandboxFor = async () => ({ id: "sb", state: "stopped" });
+  let ran = "";
+  manager.exec = async (_sandbox, command) => {
+    ran = command;
+    return { result: "--passed\n--mode\n--worker\n4242 node /workshop/langs/typescript/hello/node_modules/.bin/tsx src/worker.ts\n--workerenv\nFLAKY=1\n--stale\n--caughtup\n" };
+  };
+  const out = await manager.poll("learner", []);
+  assert.match(ran, /\[t\]sx src\/worker/);
+  assert.deepEqual(out.worker, { running: true, name: "hello-worker", command: "npm run worker", env: { FLAKY: "1" } });
+
+  // A learner on Python whose sandbox is TypeScript's is asked, and the answer is kept.
+  manager.refreshed = async () => ({ id: "sb", state: "started", labels: { language: "typescript" } });
+  manager.ensure("learner", {}, { language: "python" });
+  await manager.inflight.get("learner").promise;
+  const state = await manager.describe("learner");
+  assert.equal(state.state, "language");
+  assert.equal(state.has, "typescript");
+  assert.match(state.message, /made for TypeScript, and you build in Python now/);
+});

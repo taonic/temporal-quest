@@ -83,6 +83,13 @@ function startOver() {
           <button class="button" type="button" @click="startOver">Start over with a new sandbox</button>
         </div>
       </template>
+      <template v-else-if="store.sandbox.state === 'language'">
+        <h3>Your sandbox is for another language</h3>
+        <p>{{ store.sandbox.message }}</p>
+        <div class="status-actions">
+          <button class="button button-primary" type="button" @click="startOver">Start a new sandbox</button>
+        </div>
+      </template>
       <template v-else-if="store.sandbox.state === 'allowance'">
         <h3>You're out of sandbox time for now</h3>
         <p>{{ store.sandbox.message }}</p>

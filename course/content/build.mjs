@@ -1473,15 +1473,17 @@ function buildExercise(md, quests, ex, number, lang) {
     questions: [...new Set(mods.flatMap((m) => m.questions ?? []))],
     tour: tm ? buildTour(md, tm, files) : [],
     tourAfter,
+    // ./quest, from the workshop's folder; `quest` (on the PATH) from a language's project, where
+    // its learners' terminals open.
     scripts:
       layout === "board"
         ? {}
-        : {
-            setup: `./quest enter ${ex.id}`,
-            check: `./quest check ${ex.id}`,
-            solve: `./quest solve ${ex.id}`,
-            reset: `./quest reset ${ex.id}`,
-          },
+        : Object.fromEntries(
+            [["setup", "enter"], ["check", "check"], ["solve", "solve"], ["reset", "reset"]].map(([key, command]) => [
+              key,
+              `${lang === "python" ? "./quest" : "quest"} ${command} ${ex.id}`,
+            ]),
+          ),
     files,
     // Its challenges, by id: the question's choices, each with its recorded run.
     challenges: Object.fromEntries(challenges.map((c) => [c.id, challengeData(md, c, lang)])),
@@ -1516,8 +1518,8 @@ function exerciseData(md, quests, ex, number) {
   if (languages.length === 1) return { ...base, languages };
   const byLang = Object.fromEntries(
     languages.slice(1).map((lang) => {
-      const { worker, starter, files, tour, tourAfter, questions, modes, challenges } = buildExercise(md, quests, ex, number, lang);
-      return [lang, { worker, starter, files, tour, tourAfter, questions, modes, challenges }];
+      const { worker, starter, files, tour, tourAfter, questions, modes, challenges, scripts } = buildExercise(md, quests, ex, number, lang);
+      return [lang, { worker, starter, files, tour, tourAfter, questions, modes, challenges, scripts }];
     }),
   );
   return { ...base, languages, byLang };
