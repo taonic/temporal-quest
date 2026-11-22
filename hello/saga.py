@@ -78,4 +78,4 @@ class BookTripWorkflow:
     # A query: which card it charges, and whether it's waiting for a new one.
     @workflow.query
     def status(self) -> BookingStatus:
-        return BookingStatus(card=self.card, waiting_for_new_card=self.waiting_for_new_card)
+        return BookingStatus(card=self.card, waiting=self.waiting_for_new_card)

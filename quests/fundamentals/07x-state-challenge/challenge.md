@@ -10,7 +10,7 @@ replace: |
   while self.on_board < self.seats:
       # A durable timer: recorded in the history, so it fires even if the worker that
       # started it is gone.
-      await workflow.sleep(timedelta(seconds=flight.seconds_per_passenger))
+      await workflow.sleep(timedelta(seconds=flight.pace))
       self.on_board += 1
       # workflow.logger stays quiet while a worker replays the history, so after a restart
       # the log picks up at the next passenger instead of counting from 1 again.
@@ -24,15 +24,15 @@ choices:
 
       started = datetime.now()
       while self.on_board < self.seats:
-          await workflow.sleep(timedelta(seconds=flight.seconds_per_passenger))
-          self.on_board = int((datetime.now() - started).total_seconds() // flight.seconds_per_passenger)
+          await workflow.sleep(timedelta(seconds=flight.pace))
+          self.on_board = int((datetime.now() - started).total_seconds() // flight.pace)
     explanation: "It never boarded anyone: the workflow sandbox stopped datetime.now() (\"Cannot access datetime.datetime.now\"), so the workflow task failed, and kept failing. A replay would read a different time than the first run did, and come to a different count. Workflow code reads time with workflow.now(), the time in the history; here, counting the timers that fired is simpler still."
   - label: Keep the count to itself
     code: |
       # A local variable: nothing outside run() can touch the count.
       on_board = 0
       while on_board < self.seats:
-          await workflow.sleep(timedelta(seconds=flight.seconds_per_passenger))
+          await workflow.sleep(timedelta(seconds=flight.pace))
           on_board += 1
       self.on_board = on_board
     explanation: "Boarding was right, and it even survived the restart, but nobody could see it: the query reads self.on_board, which stayed 0 until the very end. A worker rebuilds a local as well as a field; state you want to read has to be where the query looks."
@@ -42,7 +42,7 @@ choices:
       while self.on_board < self.seats:
           # A durable timer: recorded in the history, so it fires even if the worker that
           # started it is gone.
-          await workflow.sleep(timedelta(seconds=flight.seconds_per_passenger))
+          await workflow.sleep(timedelta(seconds=flight.pace))
           self.on_board += 1
           # workflow.logger stays quiet while a worker replays the history, so after a restart
           # the log picks up at the next passenger instead of counting from 1 again.

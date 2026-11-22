@@ -191,7 +191,7 @@ async def book_with_an_expired_card(client, queue):
     for _ in range(50):
         if (await handle.describe()).status != WorkflowExecutionStatus.RUNNING:
             pytest.fail(f"An expired card ended the booking instead of waiting for a new one. {EXPIRED_HINT}")
-        if (await handle.query(BookTripWorkflow.status)).waiting_for_new_card:
+        if (await handle.query(BookTripWorkflow.status)).waiting:
             return handle
         await asyncio.sleep(0.2)
     pytest.fail(f"The booking never started waiting for a new card. {EXPIRED_HINT}")
@@ -228,7 +228,7 @@ async def test_the_expired_card_is_turned_away(env):
             pytest.fail(VALIDATOR_HINT)
         status = await handle.query(BookTripWorkflow.status)
         await handle.terminate("test done")
-    assert status.waiting_for_new_card, "turning the expired card away should leave the booking waiting"
+    assert status.waiting, "turning the expired card away should leave the booking waiting"
 
 
 # --- F12: versioning -----------------------------------------------------------------------------

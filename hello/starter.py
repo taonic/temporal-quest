@@ -98,7 +98,7 @@ async def book(origin: str, destination: str, card: str) -> None:
             status = await asyncio.wait_for(handle.query(BookTripWorkflow.status), timeout=2)
         except Exception:  # noqa: BLE001 - no worker to answer yet: keep waiting
             return False
-        if not status.waiting_for_new_card:
+        if not status.waiting:
             return False
         print(f"The card ending {status.card} has expired. The booking is waiting for a new one, holding the")
         print("flight and the hotel. Send it one from the Temporal UI: More Actions, Send an Update, new_card.")

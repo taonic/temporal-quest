@@ -20,7 +20,8 @@ class BoardingRequest(BaseModel):
     origin: str
     destination: str
     seats: int = 40
-    seconds_per_passenger: float = 2
+    # Seconds between passengers boarding.
+    pace: float = 2
 
 
 class BoardingStatus(BaseModel):
@@ -37,7 +38,8 @@ class HoldRequest(BaseModel):
 class HoldStatus(BaseModel):
     seat: str
     paid: bool
-    seconds_left: int
+    # Seconds until the hold runs out.
+    remaining: int
 
 
 class Payment(BaseModel):
@@ -59,4 +61,4 @@ class Booking(BaseModel):
 class BookingStatus(BaseModel):
     # The card it charges, and whether it's waiting for a new one because that card has expired.
     card: str
-    waiting_for_new_card: bool
+    waiting: bool

@@ -86,7 +86,7 @@ async def test_boarding_counts_every_passenger_across_a_worker_restart(env):
     queue = f"board-{uuid.uuid4().hex[:8]}"
     # The dev server fires timers about a second apart however short they are, so each
     # passenger costs a second: one boards before the restart and two after it.
-    flight = BoardingRequest(origin="SFO", destination="JFK", seats=3, seconds_per_passenger=0.5)
+    flight = BoardingRequest(origin="SFO", destination="JFK", seats=3, pace=0.5)
     async with build_worker(client, queue):
         handle = await client.start_workflow(
             BoardingWorkflow.run, flight, id=f"board-test-{uuid.uuid4().hex[:8]}", task_queue=queue

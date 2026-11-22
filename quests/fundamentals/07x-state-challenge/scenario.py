@@ -9,7 +9,7 @@ async def scenario(kit):
     from hello.shared import BoardingRequest
 
     board = kit.load()
-    flight = BoardingRequest(origin="SFO", destination="JFK", seats=SEATS, seconds_per_passenger=1)
+    flight = BoardingRequest(origin="SFO", destination="JFK", seats=SEATS, pace=1)
 
     async def count(handle) -> int | None:
         # A worker answers a query: none that can run the workflow, no answer.

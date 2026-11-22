@@ -97,6 +97,7 @@ None of them depends on having done the earlier modules, and none loses your wor
 ```
 hello/                 exercises 1 and 6: a tiny workflow, activity, worker and starter; a fare hold, an
                        itinerary of child workflows, a booking saga, and a replayer (uv run hello-…)
+                       CONTRACT.md: the names and JSON every language's hello shares
 codemode/              exercise 2's step 6: sandbox.py runs a model's script in Monty (uv run code-mode)
 travel_agent/
   agent/               TravelAgent workflow, call_llm, scripted model, prompts, trip form, travel notes,

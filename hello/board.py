@@ -29,7 +29,7 @@ class BoardingWorkflow:
         while self.on_board < self.seats:
             # A durable timer: recorded in the history, so it fires even if the worker that
             # started it is gone.
-            await workflow.sleep(timedelta(seconds=flight.seconds_per_passenger))
+            await workflow.sleep(timedelta(seconds=flight.pace))
             self.on_board += 1
             # workflow.logger stays quiet while a worker replays the history, so after a restart
             # the log picks up at the next passenger instead of counting from 1 again.

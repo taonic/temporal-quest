@@ -1,5 +1,5 @@
 {
-  "fingerprint": "e6eaec3011fdc26f",
+  "fingerprint": "8f9d0f2538ad02f8",
   "choice": "C",
   "lines": [
     {
@@ -36,19 +36,19 @@
       "type": "step",
       "text": "Query after the restart: boarded 1",
       "kind": "good",
-      "t": 1.7
+      "t": 1.8
     },
     {
       "type": "step",
       "text": "Stopped the new worker",
       "kind": "worker",
-      "t": 3.1
+      "t": 3.2
     },
     {
       "type": "step",
       "text": "Flight SFO→JFK: 3 passengers boarded.",
       "kind": "info",
-      "t": 3.1
+      "t": 3.2
     }
   ],
   "done": {
@@ -58,10 +58,10 @@
     "summary": "The count read 1, then 1, then finished at 3.",
     "result": "Flight SFO→JFK: 3 passengers boarded.",
     "error": null,
-    "focus": "challenge-fc2-c-9858-board",
+    "focus": "challenge-fc2-c-8740-board",
     "events": [
       "Workflow Execution Completed"
     ],
-    "t": 3.1
+    "t": 3.2
   }
 }

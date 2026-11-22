@@ -44,4 +44,4 @@ class FareHoldWorkflow:
     @workflow.query
     def status(self) -> HoldStatus:
         left = max(0, int((self.expires_at - workflow.now()).total_seconds()))
-        return HoldStatus(seat=self.seat, paid=self.paid_with is not None, seconds_left=left)
+        return HoldStatus(seat=self.seat, paid=self.paid_with is not None, remaining=left)
