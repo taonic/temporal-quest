@@ -1,6 +1,6 @@
 # 11 · Java: Fundamentals
 
-Status: claimed
+Status: resolved
 Blocked by: 10
 
 ## What
@@ -32,3 +32,5 @@ On 2026-11-22, all of Fundamentals comes in Java: `languages: [python, typescrip
 - **Snapshot:** `course/snapshot/languages/java.Dockerfile`: Temurin 21.0.5, the hello built once into a shared Gradle home (`/opt/gradle-home`), `quest` on the PATH, terminals in the project. No language server. 2 GiB.
 - **Site and runner:** Java's worker (`[h]ello.Main worker`) and starter patterns; `./hello <command> <args>` in prose gets a ▶. CI runs the walkthroughs of every language (`@typescript`, `@java`, `@dotnet`) from one list.
 - **Verified:** `verify_modules.py` (every Java module fails open and passes solved); 200 course tests, including Java's guide having no Python or TypeScript in it.
+- **Found by the walkthrough:** `Replay.java`'s checks-only replayer (for F12, `--provided`) had the very line F13's snippet adds, so the editor said "That's already in Replay.java" and inserted nothing. It's `ProvidedReplayer.java` now, a file learners don't get.
+- **e2e, against Daytona, one walkthrough at a time (2026-11-23):** Hello Temporal and Building blocks pass in Python, TypeScript, Java and C#, every step ending with ✓ Check; and both language switches: Java to Python keeps the sandbox (its terminals move to /workshop), Java to C# swaps it for a C# one without asking.

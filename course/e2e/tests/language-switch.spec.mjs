@@ -5,10 +5,10 @@
 import { SIGNIN_KEY, SKIP_SANDBOX, WALK_EMAIL } from "../env.mjs";
 import { allow, deleteLearner, signInApi } from "./accounts.mjs";
 import { expect, showCode, storageKey, test } from "./fixtures.mjs";
-import { MINUTE } from "./learner.mjs";
+import { Learner, MINUTE } from "./learner.mjs";
 
 // A learner who builds in `from`, then switches to `to`: their terminals' folder before and after.
-async function switchLanguage(browser, from, to, check) {
+async function switchLanguage(browser, testInfo, from, to, check) {
   test.skip(!SIGNIN_KEY, "needs E2E_SIGNIN_KEY");
   test.skip(SKIP_SANDBOX, "E2E_SKIP_SANDBOX is set");
   test.setTimeout(15 * MINUTE);
@@ -22,12 +22,13 @@ async function switchLanguage(browser, from, to, check) {
   await context.addInitScript((key) => localStorage.setItem(key, "true"), storageKey("onboarded"));
   const page = await context.newPage();
   const commands = page.locator('.terminal-pane[aria-label="The commands terminal"]');
-  // Types `pwd` into the commands terminal and waits for the folder it prints.
+  // Types `pwd` into the commands terminal and reads the folder it prints (null if nothing came back
+  // yet: the terminal may still be connecting; the poll around it types again).
+  const learner = new Learner(page, testInfo);
   const folder = async () => {
-    await commands.locator(".xterm-helper-textarea").focus();
-    await page.keyboard.type("clear; pwd\n");
-    await expect(commands.locator(".xterm-rows")).toContainText(/\/workshop\S*\s*\n?.*\$/, { timeout: MINUTE });
-    return ((await commands.locator(".xterm-rows").innerText()).match(/^(\/workshop\S*)$/m) ?? [])[1];
+    await learner.type("commands", "clear; pwd");
+    await page.waitForTimeout(1500);
+    return ((await commands.locator(".xterm-rows").innerText()).match(/^(\/workshop\S*)\s*$/m) ?? [])[1] ?? null;
   };
   const ready = () => expect(page.locator(".sandbox-pill"), "the sandbox never got ready").toHaveText(/Sandbox ready/, { timeout: 8 * MINUTE });
   try {
@@ -48,14 +49,14 @@ async function switchLanguage(browser, from, to, check) {
   }
 }
 
-test("switching from Java to Python keeps the sandbox, and its terminals move to /workshop", { tag: ["@sandbox", "@java"] }, async ({ browser }) => {
+test("switching from Java to Python keeps the sandbox, and its terminals move to /workshop", { tag: ["@sandbox", "@java"] }, async ({ browser }, testInfo) => {
   // The Java sandbox has Python: kept, its terminals now in the workshop.
-  await switchLanguage(browser, "java", "python", (folder) =>
+  await switchLanguage(browser, testInfo, "java", "python", (folder) =>
     expect.poll(folder, { message: "the terminal is still in the Java project", timeout: 2 * MINUTE }).toBe("/workshop"));
 });
 
-test("switching from Java to C# swaps the sandbox for a C# one, without asking", { tag: ["@sandbox", "@java", "@dotnet"] }, async ({ browser }) => {
+test("switching from Java to C# swaps the sandbox for a C# one, without asking", { tag: ["@sandbox", "@java", "@dotnet"] }, async ({ browser }, testInfo) => {
   // C# needs .NET, which the Java sandbox hasn't: a C# one replaces it, its terminals in its project.
-  await switchLanguage(browser, "java", "dotnet", (folder) =>
+  await switchLanguage(browser, testInfo, "java", "dotnet", (folder) =>
     expect.poll(folder, { message: "the terminal isn't in the C# project", timeout: 3 * MINUTE }).toBe("/workshop/langs/dotnet/hello"));
 });

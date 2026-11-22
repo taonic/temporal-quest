@@ -13,7 +13,7 @@ import java.nio.file.Path;
  * <pre>
  *   ./hello replay hold-15a                    (the latest workflow whose id starts hold-15a-)
  *   ./hello replay --history FILE              (a history kept as JSON: what the checks do)
- *   ./hello replay --history FILE --provided   (with the SDK's replayer, not replay() below: F12's check)
+ *   ./hello replay --history FILE --provided   (with ProvidedReplayer, not replay() below: F12's check)
  * </pre>
  *
  * <p>It runs today's workflow code over the history, the way a new worker would after a deploy. If
@@ -27,12 +27,6 @@ public final class Replay {
     static void replay(WorkflowExecutionHistory history) throws Exception {
         // A replayer is a worker with no server: it runs the workflow code over a history, and throws
         // if the code doesn't make the same decisions the history recorded.
-        WorkflowReplayer.replayWorkflowExecution(history, HelloTripWorkflowImpl.class, BoardingWorkflowImpl.class,
-                FareHoldWorkflowImpl.class, ItineraryWorkflowImpl.class, BookTripWorkflowImpl.class);
-    }
-
-    // The replayer the checks use for F12 (--provided), so a check of the patch doesn't need replay() written.
-    private static void provided(WorkflowExecutionHistory history) throws Exception {
         WorkflowReplayer.replayWorkflowExecution(history, HelloTripWorkflowImpl.class, BoardingWorkflowImpl.class,
                 FareHoldWorkflowImpl.class, ItineraryWorkflowImpl.class, BookTripWorkflowImpl.class);
     }
@@ -58,7 +52,7 @@ public final class Replay {
         }
         try {
             if (java.util.Arrays.asList(args).contains("--provided")) {
-                provided(history);
+                ProvidedReplayer.replay(history);
             } else {
                 replay(history);
             }

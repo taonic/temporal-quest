@@ -1,6 +1,6 @@
 # 12 · .NET: Fundamentals
 
-Status: claimed
+Status: resolved
 Blocked by: 10
 
 ## What
@@ -23,3 +23,4 @@ On 2026-11-22, all of Fundamentals comes in C#: `languages: [python, typescript,
 - **Text, challenges:** as Java's. FC2's clock choice reads `DateTime.UtcNow`, and falls back to 0 after the restart, as in Java, with its own explanation. FC1–FC3 recorded, every choice as flagged.
 - **Snapshot:** `course/snapshot/languages/dotnet.Dockerfile`: the .NET 10.0.404 SDK, culture-invariant (the slim base image has no ICU, and `dotnet` aborts without it), packages in `/opt/nuget`, the hello built once, csharp-ls 0.28.0 (0.29.0 is broken, ticket 02) behind the same stdio bridge as TypeScript's, on port 2089. 2 GiB.
 - **Editor:** a C# language-server client (`createLsp({ language: "dotnet" })`, LSP language id `csharp`), relayed at `/api/lsp?lang=dotnet`.
+- **e2e, against Daytona, one walkthrough at a time (2026-11-23):** Hello Temporal and Building blocks pass in Python, TypeScript, Java and C#, every step ending with ✓ Check; and both language switches: Java to Python keeps the sandbox (its terminals move to /workshop), Java to C# swaps it for a C# one without asking.
