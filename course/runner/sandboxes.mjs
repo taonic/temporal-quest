@@ -287,16 +287,14 @@ export class SandboxManager {
     let fresh = false;
 
     if (sandbox && !fitsLanguage(sandbox, run.language)) {
-      // Made for another language: the learner chooses whether to start a new one (its code
-      // goes; their progress stays), rather than having it deleted under them.
+      // Made for another language, whose toolchain this one doesn't have: the learner switched,
+      // so a sandbox for their language replaces it, without asking. Their progress stays; the
+      // code in the old one goes (the new one catches up to the modules they've done).
       const label = (id) => ({ python: "Python", typescript: "TypeScript", java: "Java", dotnet: "C#" })[id] ?? id;
-      this.#step(
-        run,
-        "language",
-        `Your sandbox was made for ${label(sandboxLanguage(sandbox))}, and you build in ${label(run.language)} now. A new sandbox for ${label(run.language)} takes about a minute: your progress stays, the code in this one goes.`,
-        { sandboxId: sandbox.id, has: sandboxLanguage(sandbox), wants: run.language },
-      );
-      return;
+      this.#step(run, "creating", `Swapping your ${label(sandboxLanguage(sandbox))} sandbox for a ${label(run.language)} one…`);
+      await this.#discard(learner, sandbox);
+      this.#stillWanted(run);
+      sandbox = null;
     }
     if (!sandbox) {
       sandbox = await this.#create(run);
@@ -720,6 +718,21 @@ export class SandboxManager {
     // A poll while it was being deleted may have found it again.
     this.cache.delete(learner);
     return sandbox;
+  }
+
+  // Deletes a sandbox the learner won't use again (one for another language), and forgets it.
+  async #discard(learner, sandbox) {
+    this.ready.delete(sandbox.id);
+    this.deleted.add(sandbox.id);
+    this.cache.delete(learner);
+    for (const key of this.previews.keys()) if (key.startsWith(`${sandbox.id}:`)) this.previews.delete(key);
+    this.onLanguageSwitch?.(sandbox.id);
+    try {
+      await withTimeout(sandbox.delete(60), 90_000, "Deleting the old sandbox");
+    } catch (err) {
+      if (!/not found|has been deleted/i.test(err.message)) throw err;
+    }
+    this.cache.delete(learner);
   }
 
   // Stops the learner's sandbox (out of sandbox time), keeping it and their edits.

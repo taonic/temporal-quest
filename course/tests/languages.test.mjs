@@ -157,16 +157,18 @@ test("a persona or language left on a shared browser never becomes the next lear
 test("the runner keeps each learner's sandbox start, state and language to that learner", async () => {
   const { SandboxManager } = await import("../runner/sandboxes.mjs");
   const manager = new SandboxManager({ maxSandboxes: 5, snapshot: "py", languageSnapshots: { typescript: "ts", java: "java" } });
-  const sandboxes = { alice: { id: "sa", state: "started", labels: { language: "typescript" } }, bob: null };
+  let deleted = [];
+  const sandboxes = {
+    alice: { id: "sa", state: "started", labels: { language: "typescript" }, delete: async () => deleted.push("sa") },
+    bob: { id: "sb", state: "started", labels: { language: "typescript" }, delete: async () => deleted.push("sb") },
+  };
   manager.refreshed = async (learner) => sandboxes[learner];
-  manager.ensure("alice", {}, { language: "java" }); // Alice's is TypeScript's: she's asked
-  manager.ensure("bob", {}, { language: "typescript" }); // Bob has none (and no Daytona here: his start fails)
-  await manager.inflight.get("alice").promise;
+  manager.ensure("alice", {}, { language: "java" }); // Alice's is TypeScript's: it's swapped for Java's
+  manager.ensure("bob", {}, { language: "typescript" }); // Bob's is his language's (no Daytona here: his start fails later)
+  await manager.inflight.get("alice").promise.catch(() => {});
   await manager.inflight.get("bob")?.promise.catch(() => {});
-  assert.equal((await manager.describe("alice")).state, "language");
-  const bob = manager.progress.get("bob");
-  assert.notEqual(bob?.state, "language", "Alice's answer isn't Bob's");
-  assert.ok(!bob?.message?.includes("made for"), "nor is her message");
+  assert.deepEqual(deleted, ["sa"], "Alice's sandbox goes, and only hers");
+  assert.ok(!manager.progress.get("bob")?.message?.includes("Swapping"), "Bob's isn't swapped");
 });
 
 test("a learner who builds in Python can use any language's sandbox; another language needs its own", async () => {

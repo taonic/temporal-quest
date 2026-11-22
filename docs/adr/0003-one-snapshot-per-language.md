@@ -5,7 +5,7 @@ Context: [.scratch/multi-language/spec.md](../../.scratch/multi-language/spec.md
 
 ## Decision
 
-Each language gets its own Daytona snapshot: the Python base (the stack, Dogwood, the dev server) plus that one toolchain (Node 24, JDK 21 with Gradle, or .NET 10), with dependencies prefetched and a warm build. A learner's sandbox starts from their language's snapshot, and changing language offers a new sandbox.
+Each language gets its own Daytona snapshot: the Python base (the stack, Dogwood, the dev server) plus that one toolchain (Node 24, JDK 21 with Gradle, or .NET 10), with dependencies prefetched and a warm build. A learner's sandbox starts from their language's snapshot. Changing to Python keeps it (every snapshot has Python); changing to another language replaces it with one from that language's snapshot, without asking: their progress stays, the old sandbox's code goes.
 
 If a language doesn't fit in 2 GiB next to `travel-stack`, its snapshot gets 4 GiB. A check takes at most 15 s on a warm build and 45 s on a first run.
 

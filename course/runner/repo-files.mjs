@@ -72,7 +72,7 @@ export function snapshotName(root = repoRoot) {
     hash.update(`${file}\0`);
     hash.update(fs.readFileSync(path.join(root, file)));
   }
-  return `governance-course-${hash.digest("hex").slice(0, 12)}`;
+  return `temporal-quest-python-${hash.digest("hex").slice(0, 12)}`;
 }
 
 // A language's snapshot (course/snapshot/build-language.mjs): today's Python one, with that
@@ -112,5 +112,5 @@ export function languageSnapshotName(language, root = repoRoot) {
     hash.update(fs.readFileSync(path.join(root, file)));
   }
   hash.update(`resources\0${JSON.stringify(LANGUAGE_RESOURCES[language] ?? null)}`);
-  return `governance-course-${language}-${hash.digest("hex").slice(0, 12)}`;
+  return `temporal-quest-${language}-${hash.digest("hex").slice(0, 12)}`;
 }

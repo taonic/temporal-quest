@@ -47,7 +47,7 @@ RUN mkdir -p "$TMPDIR" \
 RUN chmod -R a+rwX /workshop "$TMPDIR" \
  && printf '%s\n' \
       'cd /workshop' \
-      'export PS1="\[\e[38;5;141m\]workshop\[\e[0m\]:\w\$ "' \
+      'export PS1="\[\e[38;5;141m\]\$\[\e[0m\] "' \
       '[ -f /etc/bash_completion ] && . /etc/bash_completion' \
     >> /etc/bash.bashrc
 
