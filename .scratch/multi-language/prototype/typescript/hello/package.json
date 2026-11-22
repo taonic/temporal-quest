@@ -1,0 +1,24 @@
+{
+  "name": "hello",
+  "private": true,
+  "description": "Prototype (ticket 02): F2's trip workflow in TypeScript, on the hello wire contract.",
+  "scripts": {
+    "build": "tsc --build",
+    "worker": "node lib/worker.js",
+    "start": "node lib/starter.js"
+  },
+  "dependencies": {
+    "@temporalio/activity": "1.26.0",
+    "@temporalio/client": "1.26.0",
+    "@temporalio/worker": "1.26.0",
+    "@temporalio/workflow": "1.26.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.0"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

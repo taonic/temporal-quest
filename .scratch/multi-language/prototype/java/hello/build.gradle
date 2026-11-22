@@ -1,0 +1,21 @@
+// Prototype (ticket 02): F2's trip workflow in Java, on the hello wire contract.
+plugins {
+    id 'application'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'io.temporal:temporal-sdk:1.41.1'
+    implementation 'org.slf4j:slf4j-simple:2.0.17'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 21
+}
+
+application {
+    mainClass = 'hello.Main'
+}

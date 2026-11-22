@@ -1,0 +1,7 @@
+build/
+.gradle/
+# Left by an IDE or jdtls
+bin/
+.classpath
+.project
+.settings/

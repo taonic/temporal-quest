@@ -40,6 +40,10 @@
 
 **Persona**: who the course is shown to, chosen at the start and switchable at any time: **Developer** ("I build software") or **Non-developer** ("Why Temporal?"). It decides which branches, paths and badges the site shows. Progress is the learner's whatever the persona.
 
+**Language**: the SDK a Developer learner writes in: Python, TypeScript, Java or C# (.NET); ids `python`, `typescript`, `java`, `dotnet`. Chosen after the persona and switchable any time. A module has one variant per language its branch offers, and a pass counts whatever the language. Avoid "track" or "edition", which suggest a separate copy of the course.
+
+**Wire contract**: the names every language's `hello` shares with the Python one (workflow types, activities, queries, updates, task queue, JSON fields), so one Python check suite and one challenge scenario serve every language (`hello/CONTRACT.md`).
+
 **Essentials**: the Non-developer persona's branch, and its trunk. Why a process on Temporal doesn't lose its place, told as the story of a trip coordinator and a logbook, with nothing to code or type. Avoid calling it "Fundamentals", which is the Developer trunk.
 
 **Trip board**: what an Essentials module shows in place of the editor and terminals: the booking trip's logbook, the coordinator on or off shift, the outside world's bookings, and the buttons that act on them.
