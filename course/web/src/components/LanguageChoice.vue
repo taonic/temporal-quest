@@ -5,6 +5,7 @@
 // from the account menu.
 import { nextTick, onMounted, ref } from "vue";
 
+import LanguageIcon from "./LanguageIcon.vue";
 import { chooseLanguage } from "../progress.js";
 import { course, store } from "../store.js";
 
@@ -45,6 +46,7 @@ onMounted(() => nextTick(() => first.value?.focus({ preventScroll: true })));
           :aria-current="current(l.id) ? 'true' : undefined"
           @click="pick(l.id)"
         >
+          <span class="persona-icon"><LanguageIcon :id="l.id" :size="40" /></span>
           <span class="persona-label">{{ l.label }}</span>
           <span class="persona-go">{{ current(l.id) ? "Your current choice" : "Choose →" }}</span>
         </button>

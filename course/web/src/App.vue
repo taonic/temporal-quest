@@ -241,8 +241,25 @@ function finishTour() {
 // The guide's getting-started step asks for the tour (ExerciseInstructions).
 watch(() => store.pageTourRequest, startTour);
 
+// An open menu (the sandbox's, the account's) closes on Esc, or on a click anywhere outside it.
+function closeMenus(event) {
+  if (!menuOpen.value && !accountOpen.value) return;
+  if (event.type === "keydown") {
+    if (event.key !== "Escape") return;
+    menuOpen.value = false;
+    accountOpen.value = false;
+    return;
+  }
+  // Each closes unless the click is in it (its button included, which toggles it itself).
+  const inside = (selector) => Boolean(event.target.closest?.(selector));
+  if (!inside(".sandbox-menu:not(.account-menu)")) menuOpen.value = false;
+  if (!inside(".account-menu")) accountOpen.value = false;
+}
+
 onMounted(async () => {
   window.addEventListener("keydown", onShortcut);
+  window.addEventListener("keydown", closeMenus);
+  window.addEventListener("pointerdown", closeMenus);
   await refreshSession();
   // Only where the page uses it (store.js sandboxWanted): opening the map or the admin panel
   // doesn't start it.
@@ -251,7 +268,11 @@ onMounted(async () => {
   refreshHelper().then(resumeAfterConnect);
 });
 
-onBeforeUnmount(() => window.removeEventListener("keydown", onShortcut));
+onBeforeUnmount(() => {
+  window.removeEventListener("keydown", onShortcut);
+  window.removeEventListener("keydown", closeMenus);
+  window.removeEventListener("pointerdown", closeMenus);
+});
 
 // Signing in or out (from the sandbox menu too) changes what the helper can do.
 watch(() => store.authenticated, () => refreshHelper());
