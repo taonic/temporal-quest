@@ -4,6 +4,8 @@ title: Pay for it with an Update
 teaser: "Send a running workflow a message: an Update that pays for the seat, and a validator that turns a bad card away."
 learn: "Updates: a message to a running workflow, and a validator that can turn it away."
 concepts: [update, validator]
+# Not in TypeScript yet (.scratch/multi-language ticket 10).
+languages: [python]
 minutes: 6
 xp: 10
 tier: 2

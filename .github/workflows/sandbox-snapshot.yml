@@ -63,5 +63,15 @@ jobs:
           DAYTONA_API_KEY: ${{ secrets.DAYTONA_API_KEY }}
         run: node snapshot/build.mjs ${{ inputs.force && '--force' || '' }}
 
+      # Each language's snapshot (TypeScript's…): Python's with its toolchain on top. Named from
+      # its own inputs too, so it's built only when those changed (build-language.mjs).
+      - name: Build the language snapshots on Daytona
+        env:
+          DAYTONA_API_KEY: ${{ secrets.DAYTONA_API_KEY }}
+        run: |
+          for language in $(node -e 'import("./runner/repo-files.mjs").then((m) => console.log(Object.keys(m.LANGUAGE_SNAPSHOT_INPUTS).join(" ")))'); do
+            node snapshot/build-language.mjs "$language" ${{ inputs.force && '--force' || '' }}
+          done
+
       - name: Summary
         run: echo "Snapshot \`${{ steps.name.outputs.name }}\` is ready on Daytona." >> "$GITHUB_STEP_SUMMARY"

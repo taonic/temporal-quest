@@ -727,7 +727,10 @@ function createRenderer() {
   // (`uv run hello-start SEA LHR`) gets a ▶ that types it into its terminal.
   md.renderer.rules.code_inline = (tokens, idx, _options, env) => {
     const content = tokens[idx].content;
-    const file = content.replace(/:\d+$/, "");
+    // A language's text names its files from its project (`src/workflows.ts`), where its
+    // learners work: the file is that one, in langs/<language>/hello.
+    const named = content.replace(/:\d+$/, "");
+    const file = !knownFiles.has(named) && env?.home && knownFiles.has(`${env.home}/${named}`) ? `${env.home}/${named}` : named;
     const todo = /^TODO\(ch\d+\)$/.test(content);
     const attr = knownFiles.has(file)
       ? ` class="file-ref" data-file="${escapeAttr(file)}"`
@@ -870,9 +873,10 @@ function readIfExists(rel) {
   return fs.existsSync(path.join(repoRoot, rel)) ? read(rel) : null;
 }
 
-function renderPage(md, markdown, mode, sourceFile, files) {
+// `lang`: the language the page is in, whose project its file names are from.
+function renderPage(md, markdown, mode, sourceFile, files, lang = "python") {
   const { preamble, sections } = splitSections(applyMode(markdown, mode));
-  const env = { mode, sourceFile, files };
+  const env = { mode, sourceFile, files, home: lang === "python" ? "" : `langs/${lang}/hello` };
   return {
     intro: md.render(preamble, env),
     sections: sections.map((section) => ({
@@ -1489,7 +1493,7 @@ function buildExercise(md, quests, ex, number, lang) {
     challenges: Object.fromEntries(challenges.map((c) => [c.id, challengeData(md, c, lang)])),
     modes: Object.fromEntries(
       MODES.map((mode) => {
-        const page = renderPage(md, body, mode, mods[0].source, files);
+        const page = renderPage(md, body, mode, mods[0].source, files, lang);
         const maxWords = quests.branches.find((b) => b.id === mods[0].branch)?.maxWords;
         if (maxWords) checkWords(page, maxWords, where);
         for (const section of page.sections) {

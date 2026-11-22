@@ -3,6 +3,8 @@ id: FC3
 title: Ship a step without breaking a hold
 teaser: Ship the email step while an old hold is running. Pick the version that keeps both holds going, and watch each one run.
 learn: "How to ship a change that keeps old and new runs going side by side."
+# Not in TypeScript yet (.scratch/multi-language ticket 10).
+languages: [python]
 after: F12
 file: hello/hold.py
 # The block each choice replaces: the email step, as F12 left it.

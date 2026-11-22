@@ -1,5 +1,5 @@
 {
-  "fingerprint": "8f9d0f2538ad02f8",
+  "fingerprint": "92d5e09b8e473ffb",
   "choice": "A",
   "lines": [
     {
@@ -12,25 +12,25 @@
       "type": "step",
       "text": "Started the worker",
       "kind": "worker",
-      "t": 0.1
+      "t": 0.2
     },
     {
       "type": "step",
       "text": "Query before the restart: no answer",
       "kind": "bad",
-      "t": 4.7
+      "t": 4.8
     },
     {
       "type": "step",
       "text": "Stopped the worker",
       "kind": "worker",
-      "t": 4.7
+      "t": 4.8
     },
     {
       "type": "step",
       "text": "Started a new worker",
       "kind": "worker",
-      "t": 4.7
+      "t": 4.8
     },
     {
       "type": "step",
@@ -58,7 +58,7 @@
     "summary": "Boarding never got going: every workflow task failed.",
     "result": null,
     "error": "Cannot access datetime.datetime.now.__call__ from inside a workflow. If this is code from a module not used in a workflow or known to only be used deterministically from a workflow, mark the import as pass through.",
-    "focus": "challenge-fc2-a-0b87-board",
+    "focus": "challenge-fc2-a-d624-board",
     "events": [
       "Workflow Task Failed: Cannot access datetime.datetime.now.__call__ from inside a workflow. If this is code from a module not used in a workflo"
     ],

@@ -17,6 +17,14 @@ files:
   - path: hello/activities.py
   - path: hello/starter.py
   - path: hello/board.py
+langs:
+  typescript:
+    files:
+      - path: langs/typescript/hello/src/workflows.ts
+        editable: true
+      - path: langs/typescript/hello/src/activities.ts
+      - path: langs/typescript/hello/src/starter.ts
+      - path: langs/typescript/hello/src/board.ts
 ---
 
 ## 6. No worker? No problem
@@ -24,7 +32,7 @@ files:
 A workflow doesn't need a worker to start. Try it:
 
 1. Stop the worker.
-2. Start a trip: `uv run hello-start SEA LHR`. The starter waits for its result.
+2. Start a trip: <!-- lang python -->`uv run hello-start SEA LHR`<!-- /lang --><!-- lang typescript -->`npm run start -- SEA LHR`<!-- /lang -->. The starter waits for its result.
 3. <!-- local -->Open the link it printed<!-- /local --><!-- browser
 [Open its workflow](#trip/SEA-LHR)
 -->: it's **Running**, recorded in Temporal, with nothing running it.

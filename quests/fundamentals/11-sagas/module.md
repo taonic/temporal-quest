@@ -4,6 +4,8 @@ title: Undo a booking with a saga
 teaser: "Book a flight and a hotel, have the card declined, and undo what already happened, newest first."
 learn: "Sagas: undoing the steps that already happened, newest first, when a later one fails."
 concepts: [saga, non-retryable]
+# Not in TypeScript yet (.scratch/multi-language ticket 10).
+languages: [python]
 minutes: 6
 xp: 10
 tier: 2

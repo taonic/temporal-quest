@@ -4,7 +4,8 @@
   "description": "Fundamentals in TypeScript: the hello workflows, on the wire contract (hello/CONTRACT.md).",
   "scripts": {
     "worker": "tsx src/worker.ts",
-    "start": "tsx src/starter.ts",
+    "start": "tsx src/starter.ts trip",
+    "board": "tsx src/starter.ts board",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

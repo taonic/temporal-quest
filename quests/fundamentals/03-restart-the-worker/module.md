@@ -17,6 +17,14 @@ files:
   - path: hello/activities.py
   - path: hello/starter.py
   - path: hello/board.py
+langs:
+  typescript:
+    files:
+      - path: langs/typescript/hello/src/workflows.ts
+        editable: true
+      - path: langs/typescript/hello/src/activities.ts
+      - path: langs/typescript/hello/src/starter.ts
+      - path: langs/typescript/hello/src/board.ts
 ---
 
 ## 3. Restart the worker, and watch it finish
@@ -34,6 +42,6 @@ Same run, started before your fix, finished after it. **Temporal remembers where
 -->
 <!-- local -->Open the workflow again from the link the starter printed, and click its **Event History** tab.<!-- /local -->
 
-It's **Completed**, with the trip as its **Result**. The events are newest first. Near the bottom, the red **Workflow Task Failed** is your `NotImplementedError`, from before the fix. Everything above it came after the fix, in the same run: the two lookups, then **Workflow Execution Completed**.
+It's **Completed**, with the trip as its **Result**. The events are newest first. Near the bottom, the red **Workflow Task Failed** is your <!-- lang python -->`NotImplementedError`<!-- /lang --><!-- lang typescript -->`TODO(ch01)` error<!-- /lang -->, from before the fix. Everything above it came after the fix, in the same run: the two lookups, then **Workflow Execution Completed**.
 
 The bug paused the workflow instead of ending it. Temporal retried the failed step until a worker had working code, and carried on from there. That's durable execution.

@@ -435,6 +435,8 @@ export class SandboxManager {
       "rm -f .stack/*.pid",
       // An upload doesn't always keep a file's executable bit.
       "chmod +x quest",
+      // A sandbox for another language: ./quest works in it (its checks, its catch-up) from now on.
+      ...(sandboxLanguage(sandbox) === "python" ? [] : [`./quest lang ${sandboxLanguage(sandbox)}`]),
       ...(fresh ? ["./quest starter"] : []),
       "uv run --frozen travel-stack up",
       `{ ${START_LSP}; }`,

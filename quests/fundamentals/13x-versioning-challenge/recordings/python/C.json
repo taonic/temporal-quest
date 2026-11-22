@@ -1,5 +1,5 @@
 {
-  "fingerprint": "f9c2a956f2768707",
+  "fingerprint": "52e46f63c7a450b7",
   "choice": "C",
   "lines": [
     {
@@ -76,7 +76,7 @@
     "summary": "Both holds finished, and the new one sent the email.",
     "result": null,
     "error": null,
-    "focus": "challenge-fc3-c-b532-hold-14c",
+    "focus": "challenge-fc3-c-fa77-hold-14c",
     "events": [
       "15A: Marker Recorded (the patch), then send_hold_email"
     ],

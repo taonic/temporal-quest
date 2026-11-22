@@ -4,6 +4,8 @@ title: Catch a breaking change before it ships
 teaser: "Replay real histories against your new code, and find the change that would break a running workflow on your machine."
 learn: "Replay testing: catching a non-deterministic change before it reaches a running workflow."
 concepts: [replay-testing, determinism]
+# Not in TypeScript yet (.scratch/multi-language ticket 10).
+languages: [python]
 minutes: 6
 xp: 10
 tier: 2

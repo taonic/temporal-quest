@@ -8,9 +8,14 @@
 // jedi-language-server in the learner's sandbox, so it sees the workshop's venv (temporalio,
 // pydantic, the workshop's own packages); the runner relays it at /api/lsp.
 //
+// TypeScript's files get typescript-language-server the same way (createLsp's `language`): its
+// own bridge in a TypeScript sandbox, relayed at /api/lsp?lang=typescript. Its hover is the
+// server's alone (the keyword-argument docs are Python's).
+//
 // One client per editor. It connects while the sandbox is live and reconnects when the
 // connection drops (the sandbox stopped, the runner restarted); a reconnect opens the current
 // file again, so the server starts from what's in the editor.
+import { typescriptLanguage } from "@codemirror/lang-javascript";
 import { pythonLanguage } from "@codemirror/lang-python";
 import { syntaxTree } from "@codemirror/language";
 import { Prec, StateEffect, StateField } from "@codemirror/state";
@@ -40,7 +45,7 @@ window.addEventListener("unhandledrejection", (event) => {
 export const fileUri = (path) => `${ROOT}/${path}`;
 const pathOf = (uri) => (uri.startsWith(`${ROOT}/`) ? decodeURIComponent(uri.slice(ROOT.length + 1)) : null);
 // How a definition's file is shown: a library by its import path, a workshop file by its own.
-const shownPath = (uri) => decodeURIComponent(uri.match(/\/site-packages\/(.+)$/)?.[1] ?? pathOf(uri) ?? uri.replace(/^file:\/\//, ""));
+const shownPath = (uri) => decodeURIComponent(uri.match(/\/(?:site-packages|node_modules)\/(.+)$/)?.[1] ?? pathOf(uri) ?? uri.replace(/^file:\/\//, ""));
 const escape = (text) => text.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
 // --- The peek: a definition that can't be opened, shown at the cursor -----------------------
@@ -238,11 +243,12 @@ async function goToDefinition(view, workspace) {
 // openPath(path) shows that file's tab and resolves to the editor view, or to null when the
 // exercise has no such file; notOpen(path) says a reference (Shift-F12) is in a file that
 // can't be shown. F12 peeks at such a definition instead (goToDefinition).
-export function createLsp({ openPath, notOpen, ask, canAsk = () => true }) {
+// `language`: whose server (python, or typescript in a TypeScript sandbox).
+export function createLsp({ openPath, notOpen, ask, canAsk = () => true, language = "python" }) {
   const client = new LSPClient({
     rootUri: ROOT,
     timeout: 10_000, // jedi's first look at a big module (temporalio's) can take a few seconds
-    highlightLanguage: (name) => (/^py/.test(name) ? pythonLanguage : null),
+    highlightLanguage: (name) => (/^py/.test(name) ? pythonLanguage : /^(ts|typescript|js|javascript)$/.test(name) ? typescriptLanguage : null),
     workspace: (c) => new CourseWorkspace(c, { openPath, notOpen }),
     extensions: [
       serverCompletion(),
@@ -262,7 +268,7 @@ export function createLsp({ openPath, notOpen, ask, canAsk = () => true }) {
     clearTimeout(timer);
     if (!wanted || socket) return;
     const handlers = new Set();
-    const ws = new WebSocket(`${location.origin.replace(/^http/, "ws")}/api/lsp`);
+    const ws = new WebSocket(`${location.origin.replace(/^http/, "ws")}/api/lsp${language === "python" ? "" : `?lang=${language}`}`);
     socket = ws;
     // The runner says when it has reached the sandbox's server (course/ready); the handshake
     // starts then, so its initialize request doesn't time out while the server starts.
@@ -295,7 +301,7 @@ export function createLsp({ openPath, notOpen, ask, canAsk = () => true }) {
   return {
     // The extension for one file's editor state.
     plugin: (path) => [
-      client.plugin(fileUri(path), "python"),
+      client.plugin(fileUri(path), language),
       peekField,
       Prec.high(
         keymap.of([

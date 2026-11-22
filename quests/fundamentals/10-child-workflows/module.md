@@ -4,6 +4,8 @@ title: One trip, several legs
 teaser: "Split an itinerary into child workflows, one a leg, run at once, each with a history of its own."
 learn: "Child workflows: work split into parts that run at once, each with its own history."
 concepts: [child-workflow]
+# Not in TypeScript yet (.scratch/multi-language ticket 10).
+languages: [python]
 minutes: 5
 xp: 10
 tier: 2

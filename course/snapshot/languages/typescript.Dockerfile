@@ -15,4 +15,8 @@ RUN cd /workshop/langs/typescript/hello \
  && npx tsc --noEmit \
  && printf '#!/bin/sh\n# quest from anywhere: a language learner works in its project, not the workshop.\ncd /workshop && exec ./quest "$@"\n' > /usr/local/bin/quest \
  && chmod +x /usr/local/bin/quest \
- && chmod -R a+rwX /workshop/langs
+ && chmod -R a+rwX /workshop/langs \
+ && sed -i 's#^cd /workshop$#cd /workshop/langs/typescript/hello#' /etc/bash.bashrc \
+ && grep -q '^cd /workshop/langs/typescript/hello$' /etc/bash.bashrc
+# (The Python snapshot's bash.bashrc moves every shell to /workshop; a TypeScript learner's
+# terminals open in its project instead.)

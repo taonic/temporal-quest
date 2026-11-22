@@ -8,7 +8,10 @@ order: 1
 classTitle: Durable Apprentice
 worker: uv run hello-worker
 starter: uv run hello-start
-languages: [python]
+languages: [python, typescript]
+langs:
+  # TypeScript's learners work in langs/typescript/hello: their terminals open there.
+  typescript: { worker: npm run worker, starter: npm run start -- }
 agentUi: false
 maxWords: 150
 tiers:

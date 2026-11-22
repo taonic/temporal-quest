@@ -22,11 +22,25 @@ files:
   - path: hello/activities.py
   - path: hello/starter.py
   - path: hello/board.py
+langs:
+  typescript:
+    files:
+      - path: langs/typescript/hello/src/workflows.ts
+        editable: true
+      - path: langs/typescript/hello/src/activities.ts
+      - path: langs/typescript/hello/src/starter.ts
+      - path: langs/typescript/hello/src/board.ts
+    hint: "The trip workflow isn't working yet. Look for TODO(ch01) in src/workflows.ts: in airport(), get lookup_airport from proxyActivities with a 10-second startToCloseTimeout and a retry with a 2-second initialInterval, a backoffCoefficient of 2 and a 6-second maximumInterval, and await it."
 ---
 
 ## 2. Call the activity
 
+<!-- lang python -->
 Open `hello/workflow.py` and find `TODO(ch01)` in `airport()`. Replace the `raise` with a call to the activity:
+<!-- /lang -->
+<!-- lang typescript -->
+Open `src/workflows.ts` and find `TODO(ch01)` in `airport()`. Replace the `throw` with a call to the activity:
+<!-- /lang -->
 
 ```python
 # Ask Temporal to run the activity. Its result is recorded in the workflow's history,
@@ -43,9 +57,29 @@ return await workflow.execute_activity(
 )
 ```
 
+```typescript
+// Ask Temporal to run the activity. Its result is recorded in the workflow's history,
+// so a replay reuses the result instead of running the activity again.
+const { lookup_airport } = proxyActivities<typeof activities>({
+  // How long one attempt may take before Temporal times it out and tries again.
+  startToCloseTimeout: '10 seconds',
+  // Failed attempts are retried for you: wait 2s, then twice as long each time, up to 6s.
+  retry: { initialInterval: '2 seconds', backoffCoefficient: 2, maximumInterval: '6 seconds' },
+});
+return await lookup_airport(code);
+```
+
+<!-- lang python -->
 - `start_to_close_timeout`: how long one attempt may take before Temporal gives up on it and tries again.
 - `retry_policy`: how to retry. By default Temporal retries forever, backing off between attempts. Here it waits 2 seconds, then twice as long each time (4s, then 6s), and never more than 6 seconds.
 
 Workflow code never calls `lookup_airport()` directly. It asks Temporal to run it, and Temporal records the result in the history.
+<!-- /lang -->
+<!-- lang typescript -->
+- `startToCloseTimeout`: how long one attempt may take before Temporal gives up on it and tries again.
+- `retry`: how to retry. By default Temporal retries forever, backing off between attempts. Here it waits 2 seconds, then twice as long each time (4s, then 6s), and never more than 6 seconds.
+
+Workflow code never runs `lookup_airport` itself: `proxyActivities` gives it a stand-in that asks Temporal to run it, and Temporal records the result in the history.
+<!-- /lang -->
 
 Your fix is saved, but the running worker still has the old code.

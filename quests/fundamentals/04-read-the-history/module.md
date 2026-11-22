@@ -17,6 +17,14 @@ files:
   - path: hello/activities.py
   - path: hello/starter.py
   - path: hello/board.py
+langs:
+  typescript:
+    files:
+      - path: langs/typescript/hello/src/workflows.ts
+        editable: true
+      - path: langs/typescript/hello/src/activities.ts
+      - path: langs/typescript/hello/src/starter.ts
+      - path: langs/typescript/hello/src/board.ts
 ---
 
 ## 4. Read what the history remembers

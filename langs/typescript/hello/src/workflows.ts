@@ -1,10 +1,15 @@
-// The workflow: a durable function that describes a trip. Workflow code must be deterministic:
-// Temporal may replay it from its history at any time, on any worker. So it never touches the
-// outside world itself. It asks for that through activities, and Temporal records each result.
+// The workflows: durable functions. Workflow code must be deterministic: Temporal may replay it
+// from its history at any time, on any worker. So it never touches the outside world itself. It
+// asks for that through activities, and Temporal records each result.
+//
+// The worker loads this file's exports as its workflows: the trip below, and the boarding counter.
 import { proxyActivities } from '@temporalio/workflow';
 import type * as activities from './activities';
 import type { Airport, TripRequest } from './shared';
 
+export { BoardingWorkflow } from './board';
+
+// A trip: look up two airports, and describe it.
 export async function HelloTripWorkflow(trip: TripRequest): Promise<string> {
   const origin = await airport(trip.origin);
   const destination = await airport(trip.destination);

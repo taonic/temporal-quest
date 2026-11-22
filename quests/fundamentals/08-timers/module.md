@@ -4,6 +4,8 @@ title: Hold a seat with a durable timer
 teaser: Hold a seat for 20 seconds, stop the worker, and watch the hold run out on time anyway.
 learn: "Durable timers: a wait that keeps time even while no worker is running."
 concepts: [timer, wait-condition]
+# Not in TypeScript yet (.scratch/multi-language ticket 10).
+languages: [python]
 minutes: 6
 xp: 10
 tier: 2

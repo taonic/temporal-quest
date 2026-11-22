@@ -4,6 +4,8 @@ title: "Expired card: wait for a new one"
 teaser: "Book with a card that's expired. Instead of undoing the trip, wait for the traveller's new card, take it from the Temporal UI, and turn the wrong one away."
 learn: "Manual retry: a failure a person can fix waits, durably, for the fix, then tries the step again."
 concepts: [non-retryable, wait-condition, update, validator]
+# Not in TypeScript yet (.scratch/multi-language ticket 10).
+languages: [python]
 minutes: 9
 xp: 10
 tier: 2

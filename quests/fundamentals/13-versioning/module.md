@@ -4,6 +4,8 @@ title: Change a workflow that's running
 teaser: "Add a step while a hold is running, watch it break that hold, and fix it with a patch."
 learn: "Versioning with patches: changing a workflow while old runs are still in flight."
 concepts: [versioning, determinism]
+# Not in TypeScript yet (.scratch/multi-language ticket 10).
+languages: [python]
 minutes: 7
 xp: 10
 tier: 2

@@ -551,6 +551,34 @@ test("a branch's languages, and what a module gives each one, are checked", asyn
 test("every branch has its languages, Python where it names none, and every exercise its own", () => {
   const course = buildCourse();
   for (const branch of course.branches) assert.ok(branch.languages?.length, `${branch.id} has no languages`);
-  assert.deepEqual(course.branches.find((b) => b.id === "fundamentals").languages, ["python"]);
-  for (const exercise of course.exercises) assert.deepEqual(exercise.languages, ["python"], exercise.id);
+  assert.deepEqual(course.branches.find((b) => b.id === "fundamentals").languages, ["python", "typescript"]);
+  assert.deepEqual(course.languages.map((l) => l.id), ["python", "typescript"], "TypeScript has a whole tier: Fundamentals' first");
+  for (const exercise of course.exercises) {
+    assert.deepEqual(exercise.languages, exercise.id === "01-hello-temporal" ? ["python", "typescript"] : ["python"], exercise.id);
+  }
+});
+
+test("Hello Temporal in TypeScript: its own commands, files and snippet, and no Python but the stack's", () => {
+  const ex = buildCourse().exercises.find((e) => e.id === "01-hello-temporal");
+  const ts = ex.byLang.typescript;
+  assert.equal(ts.worker, "npm run worker");
+  assert.equal(ts.starter, "npm run start --");
+  assert.equal(ts.scripts.check, "quest check 01-hello-temporal");
+  assert.ok(ts.files.every((f) => f.path.startsWith("langs/typescript/hello/src/")));
+  const workflows = ts.files.find((f) => f.path.endsWith("workflows.ts"));
+  assert.ok(workflows.editable && workflows.todos.length === 1, "F2's TODO is in workflows.ts");
+  assert.ok(ts.tour.every((stop) => stop.file.startsWith("langs/typescript/")));
+  for (const mode of ["browser", "local"]) {
+    const html = [ts.modes[mode].intro, ...ts.modes[mode].sections.map((s) => s.html)].join("\n").replace(/<img [^>]*>/g, "");
+    for (const python of [/execute_activity/, /uv run hello-/, /hello\/workflow\.py/, /self\.on_board/, /\.\/quest /, /NotImplementedError/]) {
+      assert.doesNotMatch(html, python, `${mode}: TypeScript's guide still says ${python.source}`);
+    }
+    assert.match(html, /npm run worker/);
+  }
+  const browser = ts.modes.browser.sections.map((s) => s.html).join("\n");
+  assert.match(browser, /data-trip="SFO JFK"/, "npm run start -- SFO JFK is a trip button");
+  assert.match(browser, /data-insert="langs\/typescript\/hello\/src\/workflows\.ts" data-insert-mode="todo"/, "the snippet replaces the TODO");
+  assert.match(browser, /data-file="langs\/typescript\/hello\/src\/board\.ts"/, "src/board.ts in the text opens the file");
+  // Tier 2 isn't in TypeScript yet: the exercise is Python's.
+  assert.deepEqual(buildCourse().exercises.find((e) => e.id === "06-building-blocks").languages, ["python"]);
 });

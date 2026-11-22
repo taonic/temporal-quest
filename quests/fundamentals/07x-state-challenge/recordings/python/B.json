@@ -1,5 +1,5 @@
 {
-  "fingerprint": "8f9d0f2538ad02f8",
+  "fingerprint": "92d5e09b8e473ffb",
   "choice": "B",
   "lines": [
     {
@@ -58,11 +58,11 @@
     "summary": "The count was right at the end, but the query read 0 all along.",
     "result": "Flight SFO→JFK: 3 passengers boarded.",
     "error": null,
-    "focus": "challenge-fc2-b-a9eb-board",
+    "focus": "challenge-fc2-b-9017-board",
     "events": [
       "Workflow Execution Completed",
       "Query boarded: 0 while passengers boarded"
     ],
-    "t": 3.2
+    "t": 3.3
   }
 }

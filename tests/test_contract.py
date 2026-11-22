@@ -37,6 +37,10 @@ async def hello_worker(env):
         yield queue
 
 
+# The workflows of Fundamentals' second tier (hold, itinerary, saga): not in TypeScript yet.
+tier_two = pytest.mark.skipif(langs.LANGUAGE == "typescript", reason="tier 2 isn't in TypeScript yet (ticket 10)")
+
+
 def wid(name: str) -> str:
     return f"{name}-{uuid.uuid4().hex[:6]}"
 
@@ -86,6 +90,7 @@ async def test_boarding(env, plain):
         assert await handle.result() == "Flight SFO→JFK: 2 passengers boarded."
 
 
+@tier_two
 async def test_fare_hold(env, plain):
     async with hello_worker(env) as queue:
         handle = await plain.start_workflow(
@@ -102,6 +107,7 @@ async def test_fare_hold(env, plain):
         assert await activities_run(handle) == ["send_hold_email"]
 
 
+@tier_two
 async def test_itinerary(env, plain):
     async with hello_worker(env) as queue:
         workflow_id = wid("itinerary")
@@ -124,6 +130,7 @@ async def test_itinerary(env, plain):
         ]
 
 
+@tier_two
 async def test_book_trip(env, plain):
     async with hello_worker(env) as queue:
         handle = await plain.start_workflow(
@@ -137,6 +144,7 @@ async def test_book_trip(env, plain):
         assert await activities_run(handle) == ["reserve_flight", "reserve_hotel", "charge_card"]
 
 
+@tier_two
 async def test_a_declined_card_cancels_newest_first(env, plain):
     async with hello_worker(env) as queue:
         handle = await plain.start_workflow(
@@ -160,6 +168,7 @@ async def test_a_declined_card_cancels_newest_first(env, plain):
         ]
 
 
+@tier_two
 async def test_an_expired_card_waits_for_a_new_one(env, plain):
     async with hello_worker(env) as queue:
         handle = await plain.start_workflow(

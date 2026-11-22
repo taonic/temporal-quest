@@ -11,7 +11,7 @@ import { SIGNIN_KEY, SKIP_SANDBOX, WALK_EMAIL } from "../env.mjs";
 import { allow, deleteLearner, signInApi } from "./accounts.mjs";
 import { expect, showCode, storageKey, test } from "./fixtures.mjs";
 import { Learner, MINUTE } from "./learner.mjs";
-import { WALKTHROUGHS } from "./walkthroughs.mjs";
+import { LANGUAGE_WALKTHROUGHS, WALKTHROUGHS } from "./walkthroughs.mjs";
 
 test.describe("every exercise, as its instructions say", { tag: "@sandbox" }, () => {
   test.skip(!SIGNIN_KEY, "needs E2E_SIGNIN_KEY");
@@ -19,10 +19,16 @@ test.describe("every exercise, as its instructions say", { tag: "@sandbox" }, ()
   // Side by side. No retries: a retry would walk an exercise twice, in a second sandbox.
   test.describe.configure({ mode: "parallel", retries: 0 });
 
-  for (const [id, walk] of Object.entries(WALKTHROUGHS)) {
-    test(`${id}, as its instructions say`, async ({ browser }, testInfo) => {
+  // Python's, then each other language's (a learner of its own, building in it).
+  const walks = [
+    ...Object.entries(WALKTHROUGHS).map(([id, walk]) => ({ id, walk, language: "python" })),
+    ...Object.entries(LANGUAGE_WALKTHROUGHS).flatMap(([language, byId]) => Object.entries(byId).map(([id, walk]) => ({ id, walk, language }))),
+  ];
+  for (const { id, walk, language } of walks) {
+    const python = language === "python";
+    test(`${id}${python ? "" : ` in ${language}`}, as its instructions say`, { tag: python ? [] : [`@${language}`] }, async ({ browser }, testInfo) => {
       test.setTimeout(30 * MINUTE);
-      const email = WALK_EMAIL(id);
+      const email = WALK_EMAIL(python ? id : `${id}-${language}`);
       await deleteLearner(email); // one a run that died left behind, and its sandbox
       await allow(email);
       const { api } = await signInApi(email, { profile: { name: `E2E ${id}`, role: "Developer" } });
@@ -47,7 +53,8 @@ test.describe("every exercise, as its instructions say", { tag: "@sandbox" }, ()
       try {
         // Signed in, the module page starts the sandbox on its own: from the snapshot, then
         // `travel-stack up`, about a minute (more with others starting at once).
-        await page.goto(`/#/exercise/${id}`);
+        // ?lang= chooses the language (kept from then on): its guide, and its sandbox's snapshot.
+        await page.goto(`/${python ? "" : `?lang=${language}`}#/exercise/${id}`);
         await showCode(page);
         await expect(page.locator(".sandbox-pill"), "the sandbox never got ready").toHaveText(/Sandbox ready/, { timeout: 8 * MINUTE });
         const learner = new Learner(page, testInfo);

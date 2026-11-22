@@ -80,7 +80,8 @@ export function snapshotName(root = repoRoot) {
 // the Python snapshot's inputs and its own (its Dockerfile, the builder, which sizes it, and its
 // hello's package files), so either changing asks for a new one. Python's own name is unchanged.
 export const LANGUAGE_SNAPSHOT_INPUTS = {
-  typescript: ["langs/typescript/hello/package.json", "langs/typescript/hello/package-lock.json"],
+  // Its lockfile: what's installed (package.json's scripts can change without a new snapshot).
+  typescript: ["langs/typescript/hello/package-lock.json"],
 };
 
 export function languageSnapshotName(language, root = repoRoot) {

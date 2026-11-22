@@ -32,9 +32,15 @@ async function ask(l, text, did, { nudge = "Please go ahead and do it now.", ...
   return { approvals: [...happened.approvals, ...more.approvals], forms: happened.forms + more.forms, reply: more.reply };
 }
 
-export const WALKTHROUGHS = {
-  // --- 1 · Hello Temporal ---------------------------------------------------------------------
-  "01-hello-temporal": async (l) => {
+// What differs in Hello Temporal between its languages: its file, and the commands its guide gives.
+const HELLO = {
+  python: { file: "hello/workflow.py", flaky: "FLAKY=1 uv run hello-worker", board: "uv run hello-board SFO JFK", worker: "hello-worker" },
+  typescript: { file: "langs/typescript/hello/src/workflows.ts", flaky: "FLAKY=1 npm run worker", board: "npm run board -- SFO JFK", worker: "npm run worker" },
+};
+
+// --- 1 · Hello Temporal, in a language ---------------------------------------------------------
+const helloTemporal = (lang) =>
+  async (l) => {
     await l.startOver("01-hello-temporal");
 
     await l.step("Run it, and see it stop");
@@ -45,7 +51,7 @@ export const WALKTHROUGHS = {
     await expect(l.temporal.getByText("Running", { exact: true }).first(), "the workflow should be Running, paused on the bug").toBeVisible({ timeout: 30 * SECOND });
 
     await l.step("Call the activity");
-    await l.openFile("hello/workflow.py");
+    await l.openFile(lang.file);
     await l.insert();
 
     await l.step("Restart the worker, and watch it finish");
@@ -59,7 +65,7 @@ export const WALKTHROUGHS = {
     await expect(l.temporal.getByText(/Activity Task Completed/i).first(), "no completed activities in the history").toBeVisible({ timeout: 30 * SECOND });
 
     await l.step("Break it on purpose");
-    await l.runButton("FLAKY=1 uv run hello-worker", { wait: false });
+    await l.runButton(lang.flaky, { wait: false });
     await expect.poll(() => l.workerState(), { timeout: MINUTE }).toBe("running");
     await l.startTrip("LAX ORD");
     await expect(l.terminalText("worker"), "the flaky worker logged no 503").toContainText("503", { timeout: MINUTE });
@@ -75,7 +81,7 @@ export const WALKTHROUGHS = {
     await expect(l.terminalText("commands"), "the waiting SEA → LHR starter never finished").toContainText("Your trip: Seattle (SEA) to London (LHR).", { timeout: MINUTE });
 
     await l.step("Count with nothing saved");
-    await l.runButton("uv run hello-board SFO JFK", { wait: false });
+    await l.runButton(lang.board, { wait: false });
     const boarded = async () => {
       const all = [...((await l.terminalText("worker").textContent()) ?? "").matchAll(/Boarded passenger (\d+)\/40/g)];
       return all.length ? Number(all.at(-1)[1]) : 0;
@@ -89,11 +95,21 @@ export const WALKTHROUGHS = {
     // The new worker replays the history: the count picks up where it was, not from 1.
     await expect.poll(boarded, { message: "the count didn't carry on after the restart", timeout: MINUTE }).toBeGreaterThan(before);
     const text = await l.terminalText("worker").textContent();
-    expect(text.slice(text.lastIndexOf("hello-worker")), "the new worker counted from 1: the replay should stay quiet").not.toMatch(/Boarded passenger 1\/40/);
+    expect(text.slice(text.lastIndexOf(lang.worker)), "the new worker counted from 1: the replay should stay quiet").not.toMatch(/Boarded passenger 1\/40/);
     // Not done here: the Temporal UI's Queries tab (pick "boarded", Run Query), the same count.
 
     await l.check("01-hello-temporal");
-  },
+  };
+
+// Each exercise in a language other than Python, by language: walked by a learner who builds in
+// it (?lang=), in a sandbox from its snapshot. Tagged @typescript…: nightly, and after a deploy
+// that changes that language's code (e2e.yml).
+export const LANGUAGE_WALKTHROUGHS = {
+  typescript: { "01-hello-temporal": helloTemporal(HELLO.typescript) },
+};
+
+export const WALKTHROUGHS = {
+  "01-hello-temporal": helloTemporal(HELLO.python),
 
   // --- 2 · A durable travel agent session -----------------------------------------------------
   "02-durable-session": async (l) => {

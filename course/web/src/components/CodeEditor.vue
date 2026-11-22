@@ -71,7 +71,7 @@ let shownKey = "";
 const fromDisk = Annotation.define();
 const flashing = ref(false);
 
-const lsp = createLsp({
+const lspOptions = {
   async openPath(path) {
     if (!files.value.some((f) => f.path === path)) return null;
     select(path);
@@ -82,10 +82,27 @@ const lsp = createLsp({
   // From a keyword argument's hover: Ask Temporal, with the line it's on attached.
   ask: (question, { text, path }) => openHelper({ selection: { text, source: "editor", path }, question }),
   canAsk: () => !(helper.status.checked && !helper.status.enabled),
-});
-// Your copy of a Python file, while the sandbox is live (the solution has no server behind it).
-const languageServer = (path) =>
-  props.live && view.value === "mine" && path.endsWith(".py") && !extra.value.some((f) => f.path === path) ? lsp.plugin(path) : [];
+};
+const lsp = createLsp(lspOptions);
+// TypeScript's, for an exercise in TypeScript (its sandbox has the server).
+const lspTs = createLsp({ ...lspOptions, language: "typescript" });
+const hasTs = () => files.value.some((f) => f.path.endsWith(".ts"));
+function startServers() {
+  lsp.start();
+  if (hasTs()) lspTs.start();
+}
+function stopServers() {
+  lsp.stop();
+  lspTs.stop();
+}
+// Your copy of a Python or TypeScript file, while the sandbox is live (the solution has no
+// server behind it).
+const languageServer = (path) => {
+  if (!props.live || view.value !== "mine" || extra.value.some((f) => f.path === path)) return [];
+  if (path.endsWith(".py")) return lsp.plugin(path);
+  if (path.endsWith(".ts")) return lspTs.plugin(path);
+  return [];
+};
 
 // The lines a snippet just went into, highlighted for a moment so you can see where; and, just
 // before, the lines it's about to replace (`cls: "cm-outgoing"`).
@@ -815,8 +832,8 @@ watch([active, view], () => {
 watch(
   () => props.live,
   (live) => {
-    if (live) lsp.start();
-    else lsp.stop();
+    if (live) startServers();
+    else stopServers();
     if (live) for (const file of files.value) loadFile(file.path);
     else {
       for (const key of Object.keys(docs)) delete docs[key];
@@ -861,7 +878,7 @@ onMounted(() => {
   shownKey = `${active.value}|${view.value}|${canEdit.value}`;
   countDoc(editor.state.doc);
   if (props.live) {
-    lsp.start();
+    startServers();
     for (const file of files.value) loadFile(file.path);
   }
   unregister = registerHook("file", openAt);
@@ -880,7 +897,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   saveNow();
-  lsp.stop();
+  stopServers();
   editor?.destroy();
   unregister?.();
   unregisterInsert?.();

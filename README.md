@@ -71,6 +71,19 @@ uv run travel-worker                 # the agent's worker: in its own terminal, 
 
 `travel-stack status | restart <service> | stop <service> | logs <service> | down`. The verifier reloads `policies/travel.dw` whenever you save a version that validates. If a Temporal server is already listening on `TEMPORAL_ADDRESS`, the stack uses it rather than starting its own.
 
+### In TypeScript
+
+Fundamentals' first tier (Hello Temporal) also comes in TypeScript; the rest of the workshop is Python whatever you choose. You need [Node 24](https://nodejs.org), and the stack above (`uv run travel-stack up`) as for Python. Then:
+
+```bash
+./quest lang typescript              # do the modules in TypeScript (./quest lang python to switch back)
+cd langs/typescript/hello && npm install
+npm run worker                       # the worker, in its own terminal
+npm run start -- SFO JFK             # a trip; npm run board -- SFO JFK, a boarding
+```
+
+The checks are the same Python ones, run against your TypeScript worker: `../../../quest check F2`, or `./quest check F2` from the repo root.
+
 ### Starter or solution
 
 The repo ships **solved**. To do the exercises, switch the exercise files to the starter:

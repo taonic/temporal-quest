@@ -59,6 +59,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       tier: ${{ steps.scope.outputs.tier }}
+      typescript: ${{ steps.scope.outputs.typescript }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -73,7 +74,7 @@ jobs:
           PUSHED_FROM: ${{ github.event.before }}
         run: |
           case "$GITHUB_EVENT_NAME" in
-            schedule) tier=all ;;
+            schedule) tier=all; typescript=yes ;;
             workflow_dispatch) tier="$INPUT_TIER" ;;
             workflow_run)
               # The last successful deploy before this one.
@@ -83,8 +84,14 @@ jobs:
               if [ "$DEPLOY_EVENT" != push ] || [ -z "$before" ] || ! git cat-file -e "$before^{commit}" 2>/dev/null; then
                 tier=all # a manual deploy, or history we can't see: test everything
               elif git diff --name-only "$before" "$DEPLOYED" | grep -qE \
-                '^(quests|starter|tests|hello|codemode|travel_agent|policies|scripts|authoring)/|^(pyproject.toml|uv.lock|agents.toml|.env.example|quest)$|^course/(runner|snapshot|content|web)/'; then
+                '^(quests|starter|tests|hello|codemode|travel_agent|policies|scripts|authoring|langs)/|^(pyproject.toml|uv.lock|agents.toml|.env.example|quest)$|^course/(runner|snapshot|content|web)/'; then
                 tier=all
+              fi
+              # A language's walkthroughs (@typescript) run nightly, and on a deploy that changes
+              # that language's code or the modules it's in.
+              if [ "$tier" = all ] && { [ -z "$before" ] || git diff --name-only "$before" "$DEPLOYED" | grep -qE \
+                '^(langs|authoring/langs|starter/langs)/typescript/|^quests/fundamentals/|^course/snapshot/languages/'; }; then
+                typescript=yes
               fi ;;
             *)
               # A push to the tests: the cheap tiers. Unless it deploys too (deploy.yml runs on any
@@ -98,7 +105,8 @@ jobs:
               fi ;;
           esac
           echo "tier=$tier" >> "$GITHUB_OUTPUT"
-          echo "E2E tier: $tier" >> "$GITHUB_STEP_SUMMARY"
+          echo "typescript=${typescript:-no}" >> "$GITHUB_OUTPUT"
+          echo "E2E tier: $tier (TypeScript walkthroughs: ${typescript:-no})" >> "$GITHUB_STEP_SUMMARY"
 
   e2e:
     needs: scope
@@ -110,6 +118,7 @@ jobs:
         working-directory: course/e2e
     env:
       TIER: ${{ needs.scope.outputs.tier }}
+      TYPESCRIPT: ${{ needs.scope.outputs.typescript }}
       # A schedule has no inputs: always emailed. Anything else but a run by hand: a failure only.
       EMAIL: ${{ inputs.email || (github.event_name == 'schedule' && 'always') || 'failure' }}
       E2E_SIGNIN_KEY: ${{ secrets.E2E_SIGNIN_KEY }}
@@ -147,7 +156,9 @@ jobs:
             auth)   grep="--grep=@public|@auth" ;;
             *)      echo "unknown tier: $TIER"; exit 2 ;;
           esac
-          npx playwright test $grep
+          # A run by hand tests every language; otherwise TypeScript's walkthroughs only when scope said so.
+          [ "$GITHUB_EVENT_NAME" != workflow_dispatch ] && [ "$TYPESCRIPT" != yes ] && skip="--grep-invert=@typescript"
+          npx playwright test $grep $skip
 
       - name: Summarize
         if: always()
