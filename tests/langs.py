@@ -81,37 +81,34 @@ _built = False
 _workers: dict[tuple[str, str], subprocess.Popen] = {}
 
 
-def app_dir() -> Path:
-    return LANGS_ROOT / LANGUAGE / "hello"
+class LanguageError(Exception):
+    """The learner's code wouldn't build or start: the message says what it printed."""
 
 
-def runtime() -> Runtime:
-    if LANGUAGE not in RUNTIMES:
-        raise ValueError(f"QUEST_LANG={LANGUAGE} isn't one of python, {', '.join(RUNTIMES)}")
-    return RUNTIMES[LANGUAGE]
+def runtime(language: str = LANGUAGE) -> Runtime:
+    if language not in RUNTIMES:
+        raise ValueError(f"language {language} isn't one of python, {', '.join(RUNTIMES)}")
+    return RUNTIMES[language]
 
 
-def queue(prefix: str) -> str:
-    """A task queue for a check. Python's tests each have their own; another language's share
-    one per prefix for the check, so its worker starts once."""
-    return f"{prefix}-{uuid.uuid4().hex[:8]}" if PYTHON else f"{prefix}-{SESSION}"
+def app_root(language: str = LANGUAGE) -> Path:
+    """Where a language's hello is: langs/<language>/hello (under QUEST_LANGS_ROOT, if it's set)."""
+    return LANGS_ROOT / language / "hello"
 
 
-def history(name: str) -> Path:
-    """A recorded history, in the learner's language: Java versions a workflow differently."""
-    return HISTORIES / f"{name}.json" if PYTHON else HISTORIES / LANGUAGE / f"{name}.json"
+def repo_path(rel: str) -> Path:
+    """A repo-relative path (`langs/typescript/hello/src/workflows.ts`), wherever QUEST_LANGS_ROOT
+    puts langs/."""
+    return LANGS_ROOT / rel.removeprefix("langs/") if rel.startswith("langs/") else ROOT / rel
 
 
-def build() -> None:
-    """Builds the learner's code, once a check. A compile error fails the check, with its output."""
-    global _built
-    if _built or not runtime().build:
-        _built = True
+def build_app(language: str, app: Path) -> None:
+    """Builds a language's hello in `app` (TypeScript has nothing to build)."""
+    if not runtime(language).build:
         return
-    done = subprocess.run(runtime().build, cwd=app_dir(), capture_output=True, text=True)
+    done = subprocess.run(runtime(language).build, cwd=app, capture_output=True, text=True)
     if done.returncode != 0:
-        pytest.fail(f"Your code doesn't build:\n{(done.stdout + done.stderr).strip()[-3000:]}", pytrace=False)
-    _built = True
+        raise LanguageError(f"Your code doesn't build:\n{(done.stdout + done.stderr).strip()[-3000:]}")
 
 
 async def _polled(client, task_queue: str, kind) -> bool:
@@ -129,21 +126,20 @@ async def _ready(client, task_queue: str, mode: str) -> bool:
     return all([await _polled(client, task_queue, kind) for kind in kinds])
 
 
-async def _start(client, task_queue: str, mode: str = "workflows") -> subprocess.Popen:
-    """A worker of the learner's language's (its workflows, or with `mode` all, its activities
-    too), once it polls `task_queue`."""
-    build()
+async def start_worker(client, language: str, app: Path, task_queue: str, mode: str = "workflows") -> subprocess.Popen:
+    """A worker of a language's hello in `app` (its workflows, or with `mode` all, its activities
+    too), once it polls `task_queue`. It has to be built first (build_app)."""
     env = {
         **os.environ,
         "TEMPORAL_ADDRESS": client.service_client.config.target_host,
         "TEMPORAL_NAMESPACE": client.namespace,
         "HELLO_TASK_QUEUE": task_queue,
         "WORKER_MODE": mode,
-        **dict(runtime().env),
+        **dict(runtime(language).env),
     }
     proc = subprocess.Popen(
-        runtime().worker,
-        cwd=app_dir(),
+        runtime(language).worker,
+        cwd=app,
         env=env,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -153,15 +149,15 @@ async def _start(client, task_queue: str, mode: str = "workflows") -> subprocess
     started = time.monotonic()
     while not await _ready(client, task_queue, mode):
         if proc.poll() is not None:
-            pytest.fail(f"Your worker stopped before it started:\n{proc.stdout.read().strip()[-3000:]}", pytrace=False)
+            raise LanguageError(f"Your worker stopped before it started:\n{proc.stdout.read().strip()[-3000:]}")
         if time.monotonic() - started > START_TIMEOUT:
-            _stop(proc)
-            pytest.fail(f"Your worker didn't start polling within {START_TIMEOUT}s", pytrace=False)
+            stop(proc)
+            raise LanguageError(f"Your worker didn't start polling within {START_TIMEOUT}s")
         await asyncio.sleep(0.1)
     return proc
 
 
-def _stop(proc: subprocess.Popen) -> None:
+def stop(proc: subprocess.Popen) -> None:
     with contextlib.suppress(ProcessLookupError):
         os.killpg(proc.pid, signal.SIGTERM)
     try:
@@ -171,10 +167,43 @@ def _stop(proc: subprocess.Popen) -> None:
         proc.wait()
 
 
+# --- In a check: the learner's language, and its errors as the check's failure -----------------
+
+
+def queue(prefix: str) -> str:
+    """A task queue for a check. Python's tests each have their own; another language's share
+    one per prefix for the check, so its worker starts once."""
+    return f"{prefix}-{uuid.uuid4().hex[:8]}" if PYTHON else f"{prefix}-{SESSION}"
+
+
+def history(name: str) -> Path:
+    """A recorded history, in the learner's language: Java versions a workflow differently."""
+    return HISTORIES / f"{name}.json" if PYTHON else HISTORIES / LANGUAGE / f"{name}.json"
+
+
+def build() -> None:
+    """Builds the learner's code, once a check. A compile error fails the check, with its output."""
+    global _built
+    if not _built:
+        try:
+            build_app(LANGUAGE, app_root())
+        except LanguageError as err:
+            pytest.fail(str(err), pytrace=False)
+        _built = True
+
+
+async def _start(client, task_queue: str, mode: str) -> subprocess.Popen:
+    build()
+    try:
+        return await start_worker(client, LANGUAGE, app_root(), task_queue, mode)
+    except LanguageError as err:
+        pytest.fail(str(err), pytrace=False)
+
+
 def stop_all() -> None:
     """The check's workers, stopped: at the end of the check (conftest.py)."""
     while _workers:
-        _stop(_workers.popitem()[1])
+        stop(_workers.popitem()[1])
 
 
 @contextlib.asynccontextmanager
@@ -201,7 +230,7 @@ async def hello_worker(client, task_queue: str, *, fresh: bool = False, own_acti
                 yield
     finally:
         if fresh:
-            _stop(proc)
+            stop(proc)
 
 
 def replay(path: Path) -> tuple[str, str]:
@@ -210,7 +239,7 @@ def replay(path: Path) -> tuple[str, str]:
     build()
     done = subprocess.run(
         [*runtime().replay, "--history", str(path)],
-        cwd=app_dir(),
+        cwd=app_root(),
         env={**os.environ, **dict(runtime().env)},
         capture_output=True,
         text=True,

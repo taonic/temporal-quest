@@ -24,7 +24,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from challenges import build as build_challenge  # noqa: E402
-from challenges import challenges  # noqa: E402
+from challenges import build_language, challenges  # noqa: E402
 from record_walkthroughs import module_dirs as essentials_modules  # noqa: E402
 from record_walkthroughs import stale as stale_walkthrough  # noqa: E402
 from render import blocks, masters, outputs, render, todo_modules  # noqa: E402
@@ -76,26 +76,33 @@ def unique_todos() -> list[str]:
 
 
 def recorded_challenges() -> list[str]:
-    """Each challenge's recordings: there, made from the challenge as it is, and each choice
-    right or wrong as its flag says. Its patches apply to its file, too."""
+    """Each challenge's recordings, in each of its languages: there, made from the challenge as it
+    is, and each choice right or wrong as its flag says. Its patches apply to its file, too."""
     problems = []
     for ch in challenges().values():
         try:
             shutil.rmtree(build_challenge(ch, {c.id: c.code for c in ch.choices}))
+            for language in ch.languages[1:]:
+                for app in build_language(ch, language, {c.id: c.code_in(language) for c in ch.choices}).values():
+                    shutil.rmtree(app)
         except ValueError as err:
             problems.append(str(err))
             continue
-        for choice in ch.choices:
-            path = ch.dir / "recordings" / f"{choice.id}.json"
-            if not path.exists():
-                problems.append(f"{ch.id} {choice.id}: no recording (run scripts/record_challenges.py {ch.id})")
-                continue
-            recording = json.loads(path.read_text())
-            if recording["fingerprint"] != ch.fingerprint():
-                problems.append(f"{ch.id} {choice.id}: its recording is stale (scripts/record_challenges.py {ch.id})")
-            elif recording["done"]["right"] != choice.right:
-                problems.append(f"{ch.id} {choice.id}: came out {'right' if recording['done']['right'] else 'wrong'}, "
-                                f"but it's marked {'right' if choice.right else 'wrong'}")
+        for language in ch.languages:
+            name = ch.id if language == "python" else f"{ch.id} {language}"
+            again = f"scripts/record_challenges.py {ch.id}" + ("" if language == "python" else f" --lang {language}")
+            for choice in ch.choices:
+                path = ch.recordings(language) / f"{choice.id}.json"
+                if not path.exists():
+                    problems.append(f"{name} {choice.id}: no recording (run {again})")
+                    continue
+                recording = json.loads(path.read_text())
+                if recording["fingerprint"] != ch.fingerprint(language):
+                    problems.append(f"{name} {choice.id}: its recording is stale ({again})")
+                elif recording["done"]["right"] != choice.right:
+                    came = "right" if recording["done"]["right"] else "wrong"
+                    marked = "right" if choice.right else "wrong"
+                    problems.append(f"{name} {choice.id}: came out {came}, but it's marked {marked}")
     return problems
 
 

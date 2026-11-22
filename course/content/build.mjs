@@ -954,9 +954,8 @@ export function loadQuests() {
     for (const a of branch.welcome?.about ?? []) if (!(a.title && a.text)) throw new Error(`${branchFile}: each of its welcome's about needs a title and a text`);
     if (!LAYOUTS.includes(branch.layout)) throw new Error(`${branchFile}: layout ${branch.layout} isn't one of ${LAYOUTS.join(", ")}`);
     for (const moduleDir of subdirs(`${QUESTS}/${dir}`)) {
-      const challenge = loadChallenge(`${QUESTS}/${dir}/${moduleDir}`, dir);
+      const challenge = loadChallenge(`${QUESTS}/${dir}/${moduleDir}`, dir, branch.languages);
       if (challenge) {
-        if (branch.languages.length > 1) throw new Error(`${challenge.source}: challenges don't have languages yet (.scratch/multi-language ticket 07), and ${dir} has ${branch.languages.join(", ")}`);
         if (modules.has(challenge.id)) throw new Error(`${challenge.source}: id ${challenge.id} is also ${modules.get(challenge.id).source}'s`);
         modules.set(challenge.id, challenge);
         branch.modules.push(challenge.id);
@@ -1189,7 +1188,12 @@ function loadBossPool(source, modules, branch) {
 
 // A question challenge (Essentials') has no file, no block it replaces and no code in its
 // choices: nothing runs, so it has no scenario and no recordings. Its choices are plain answers.
-function loadChallenge(dir, branch) {
+// In a branch with several languages, `langs:` gives each other language's file, replace (and
+// hint), and each choice's `langs:` its code (and explanation); its recordings are per language
+// (recordings/<language>/A.json), and its text can have language blocks.
+const CHALLENGE_LANG_KEYS = ["file", "replace", "hint"];
+const CHOICE_LANG_KEYS = ["code", "explanation"];
+function loadChallenge(dir, branch, languages = ["python"]) {
   const source = `${dir}/challenge.md`;
   if (!fs.existsSync(path.join(repoRoot, source))) return null;
   const { meta, body } = parseFrontmatter(read(source));
@@ -1198,17 +1202,46 @@ function loadChallenge(dir, branch) {
     if (meta[key] == null) throw new Error(`${source}: no ${key} in its frontmatter`);
   }
   checkChoices(source, meta.choices);
-  const choices = meta.choices.map((c, i) => {
+  checkLanguageText(source, body, languages);
+  const others = languages.slice(1);
+  for (const [l, given] of Object.entries(meta.langs ?? {})) {
+    if (!others.includes(l)) throw new Error(`${source}: langs.${l}, but ${l} isn't one of its branch's other languages (${others.join(", ") || "none"})`);
+    for (const key of Object.keys(given ?? {})) if (!CHALLENGE_LANG_KEYS.includes(key)) throw new Error(`${source}: langs.${l}.${key} isn't one of ${CHALLENGE_LANG_KEYS.join(", ")}`);
+  }
+  if (!question) {
+    for (const l of others) for (const key of ["file", "replace"]) if (!meta.langs?.[l]?.[key]) throw new Error(`${source}: no langs.${l}.${key}`);
+  }
+  // A choice in one language: its code and explanation there, and its recorded run.
+  const choiceIn = (c, i, lang) => {
     const id = "ABCD"[i];
+    const given = lang === languages[0] ? {} : (c.langs?.[lang] ?? {});
+    for (const key of Object.keys(c.langs?.[lang] ?? {})) if (!CHOICE_LANG_KEYS.includes(key)) throw new Error(`${source}: choice ${id}'s langs.${lang}.${key} isn't one of ${CHOICE_LANG_KEYS.join(", ")}`);
+    const explanation = given.explanation ?? c.explanation;
     if (question) {
       if (c.code != null) throw new Error(`${source}: choice ${id} has code, but the challenge has no file (a question challenge's choices are plain answers)`);
-      return { id, label: c.label, code: "", explanation: c.explanation, right: Boolean(c.right), recording: null };
+      return { id, label: c.label, code: "", explanation, right: Boolean(c.right), recording: null };
     }
-    const recording = readIfExists(`${dir}/recordings/${id}.json`);
-    if (!recording) throw new Error(`${source}: choice ${id} has no recording (uv run python scripts/record_challenges.py ${meta.id})`);
+    if (lang !== languages[0] && given.code == null) throw new Error(`${source}: choice ${id} has no langs.${lang}.code`);
+    const recording = readIfExists(`${dir}/recordings/${lang}/${id}.json`);
+    if (!recording) {
+      const again = lang === "python" ? meta.id : `${meta.id} --lang ${lang}`;
+      throw new Error(`${source}: choice ${id} has no ${lang} recording (uv run python scripts/record_challenges.py ${again})`);
+    }
     const { lines, done } = JSON.parse(recording);
-    return { id, label: c.label, code: c.code ?? "", explanation: c.explanation, right: Boolean(c.right), recording: { lines, done } };
-  });
+    return { id, label: c.label, code: (lang === languages[0] ? c.code : given.code) ?? "", explanation, right: Boolean(c.right), recording: { lines, done } };
+  };
+  const choices = meta.choices.map((c, i) => choiceIn(c, i, languages[0]));
+  const byLang = Object.fromEntries(
+    others.map((l) => [
+      l,
+      {
+        file: meta.langs?.[l]?.file ?? null,
+        replace: meta.langs?.[l]?.replace ?? null,
+        hint: meta.langs?.[l]?.hint ?? meta.hint,
+        choices: meta.choices.map((c, i) => choiceIn(c, i, l)),
+      },
+    ]),
+  );
   return {
     id: meta.id,
     kind: "challenge",
@@ -1230,6 +1263,8 @@ function loadChallenge(dir, branch) {
     replace: meta.replace ?? null,
     hint: meta.hint,
     choices,
+    languages,
+    byLang,
   };
 }
 
@@ -1307,7 +1342,8 @@ function buildExercise(md, quests, ex, number, lang) {
   const texts = mods.map((m) => {
     const challenge = challenges.find((c) => c.after === m.id);
     if (!challenge) return m.body.trim();
-    const section = `## Challenge: ${challenge.title}\n\n${challenge.body.trim()}`;
+    const text = applyLanguage(challenge.body, lang, branchOf(challenge).languages);
+    const section = `## Challenge: ${challenge.title}\n\n${text.trim()}`;
     beats.set(challenge.id, [slugify(`Challenge: ${challenge.title}`)]);
     // Before the module's check, or (a world check on a beat of its own: E8's, before the
     // course's closing beat) right after that beat.
@@ -1413,7 +1449,7 @@ function buildExercise(md, quests, ex, number, lang) {
           },
     files,
     // Its challenges, by id: the question's choices, each with its recorded run.
-    challenges: Object.fromEntries(challenges.map((c) => [c.id, challengeData(md, c)])),
+    challenges: Object.fromEntries(challenges.map((c) => [c.id, challengeData(md, c, lang)])),
     modes: Object.fromEntries(
       MODES.map((mode) => {
         const page = renderPage(md, body, mode, mods[0].source, files);
@@ -1446,8 +1482,8 @@ function exerciseData(md, quests, ex, number) {
   if (languages.length === 1) return { ...base, languages };
   const byLang = Object.fromEntries(
     languages.slice(1).map((lang) => {
-      const { worker, files, tour, tourAfter, questions, modes } = buildExercise(md, quests, ex, number, lang);
-      return [lang, { worker, files, tour, tourAfter, questions, modes }];
+      const { worker, files, tour, tourAfter, questions, modes, challenges } = buildExercise(md, quests, ex, number, lang);
+      return [lang, { worker, files, tour, tourAfter, questions, modes, challenges }];
     }),
   );
   return { ...base, languages, byLang };
@@ -1493,8 +1529,9 @@ function worldCheckData(md, m, beats) {
 }
 
 // What the guide needs to run a challenge: its choices (the code, highlighted, and the block it
-// replaces, for the diff), the hint, and each choice's recording.
-function challengeData(md, c) {
+// replaces, for the diff), the hint, and each choice's recording, in one of its languages.
+function challengeData(md, challenge, lang) {
+  const c = challenge.byLang?.[lang] ? { ...challenge, ...challenge.byLang[lang] } : challenge;
   return {
     id: c.id,
     title: c.title,

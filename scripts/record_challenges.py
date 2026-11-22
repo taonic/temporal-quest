@@ -2,9 +2,10 @@
 
     uv run python scripts/record_challenges.py          # every challenge
     uv run python scripts/record_challenges.py FC2      # one
+    uv run python scripts/record_challenges.py FC2 --lang typescript   # one language (default: all of its own)
 
 Each choice runs on its own (a process each, as in a sandbox) against one fresh Temporal dev
-server, and its JSON lines go to quests/…/recordings/<choice>.json, with the challenge's
+server, and its JSON lines go to quests/…/recordings/<language>/<choice>.json, with the challenge's
 fingerprint. scripts/verify_modules.py fails if a recording is missing or stale, or if a choice
 didn't come out the way its `right` flag says.
 """
@@ -21,12 +22,13 @@ from challenges import challenges  # noqa: E402
 from quests import ROOT  # noqa: E402
 
 
-async def record(challenge, address: str) -> None:
-    out = challenge.dir / "recordings"
-    out.mkdir(exist_ok=True)
+async def record(challenge, address: str, language: str) -> None:
+    out = challenge.recordings(language)
+    out.mkdir(parents=True, exist_ok=True)
     for choice in challenge.choices:
         proc = await asyncio.create_subprocess_exec(
             sys.executable, str(ROOT / "scripts/quest.py"), "challenge", challenge.id, choice.id, "--json",
+            "--lang", language,
             cwd=ROOT, env={**os.environ, "TEMPORAL_ADDRESS": address},
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
         )
@@ -37,25 +39,31 @@ async def record(challenge, address: str) -> None:
             sys.exit(f"{challenge.id} {choice.id}: the scenario didn't finish (exit {proc.returncode})")
         # A recording has no Temporal UI to open: its workflows were on a server that's gone.
         recording = {
-            "fingerprint": challenge.fingerprint(),
+            "fingerprint": challenge.fingerprint(language),
             "choice": choice.id,
             "lines": [line for line in lines if line["type"] == "step"],
             "done": {k: v for k, v in done.items() if k != "workflows"},
         }
         (out / f"{choice.id}.json").write_text(json.dumps(recording, indent=2, ensure_ascii=False) + "\n")
         mark = "✓" if done["right"] == choice.right else "✗ (expected the opposite)"
-        print(f"{challenge.id} {choice.id} {'right' if done['right'] else 'wrong'} {mark}  {done['summary']}")
+        name = challenge.id if language == "python" else f"{challenge.id} {language}"
+        print(f"{name} {choice.id} {'right' if done['right'] else 'wrong'} {mark}  {done['summary']}")
 
 
-async def main(ids: list[str]) -> None:
+async def main(ids: list[str], language: str | None) -> None:
     from temporalio.testing import WorkflowEnvironment
 
     picked = [c for c in challenges().values() if not ids or c.id in ids]
     async with await WorkflowEnvironment.start_local() as env:
         address = env.client.service_client.config.target_host
         for challenge in picked:
-            await record(challenge, address)
+            for each in [language] if language else challenge.languages:
+                if each in challenge.languages:
+                    await record(challenge, address, each)
 
 
 if __name__ == "__main__":
-    asyncio.run(main([a.upper() for a in sys.argv[1:]]))
+    args = sys.argv[1:]
+    language = args[args.index("--lang") + 1] if "--lang" in args else None
+    ids = [a.upper() for a in args if a not in ("--lang", language)]
+    asyncio.run(main(ids, language))

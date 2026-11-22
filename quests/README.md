@@ -125,7 +125,7 @@ A **challenge** is a checkpoint after a module: 3 (at most 4) versions of the co
 ```
 challenge.md          the question: frontmatter, then its text (a sentence or two)
 scenario.py           drives one choice against Temporal, and says what happened
-recordings/A.json …   each choice's run, for learners without a sandbox (committed)
+recordings/python/A.json …   each choice's run, per language, for learners without a sandbox (committed)
 ```
 
 ```yaml
@@ -149,12 +149,18 @@ choices:
     right: true              # exactly one
     code: …
     explanation: …
+    langs:                   # in a branch with several languages: each other one's code (and explanation)
+      typescript: { code: … }
+langs:                       # each other language's file and replace (and hint)
+  typescript: { file: langs/typescript/hello/src/workflows.ts, replace: … }
 ---
 ```
 
 **The scenario** is `async def scenario(kit)`. `kit.load()` imports the challenge's file as this choice has it (`kit.load("before")`: without the block at all), `kit.worker([...])` runs a worker on the run's own task queue, `kit.workflow_id(name)` names a workflow, `kit.step(text, kind)` adds a line to the timeline as it happens (`info`, `good`, `bad` or `worker`), `kit.event(text)` notes a history event that matters, and `kit.finish(right, summary, …)` gives the answer. A run takes at most 20 seconds: keep timers and retries short.
 
 In a sandbox, the page types `./quest challenge FC1 B --run X` into the commands terminal when a learner locks a choice in (it's the page's command, not one the guide mentions). It builds the choice's code in a temp copy, runs the scenario against the sandbox's Temporal, prints the timeline, and writes a JSON line a step to `.course/challenges/FC1-B.jsonl` for the page. `uv run python scripts/record_challenges.py [FC1]` records every choice against a fresh dev server, and `scripts/verify_modules.py` fails if a recording is missing or stale, a patch doesn't apply, or a choice didn't come out the way its `right` flag says. Change a challenge, its scenario or the code it varies: record it again.
+
+**In another language** (a branch with several, and `--lang` or the learner's `./quest lang`), the scenario stays Python and runs as it is: `kit.load()` still gives the Python version of the choice, whose classes are the handles it starts and queries workflows by (the wire contract keeps them the same in every language), but `kit.worker([...], activities)` runs the workflows in a worker of the learner's language, built from a copy of `langs/<language>/hello` with that version's block in, and the activities beside it in Python. `scripts/record_challenges.py FC1 --lang typescript` records it into `recordings/typescript/`.
 
 ## Languages
 

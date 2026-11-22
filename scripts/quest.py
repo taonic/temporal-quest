@@ -327,7 +327,8 @@ def main() -> None:
         from challenges import run_live
 
         run_id = args[args.index("--run") + 1] if "--run" in args else None
-        return asyncio.run(run_live(args[1], args[2], run_id=run_id, as_json="--json" in args))
+        language = args[args.index("--lang") + 1] if "--lang" in args else None
+        return asyncio.run(run_live(args[1], args[2], run_id=run_id, as_json="--json" in args, language=language))
     if len(args) != 2 or args[0] not in COMMANDS:
         sys.exit(__doc__)
     try:
