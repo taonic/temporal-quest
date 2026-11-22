@@ -4,8 +4,6 @@ title: Change a workflow that's running
 teaser: "Add a step while a hold is running, watch it break that hold, and fix it with a patch."
 learn: "Versioning with patches: changing a workflow while old runs are still in flight."
 concepts: [versioning, determinism]
-# Not in TypeScript yet (.scratch/multi-language ticket 10).
-languages: [python]
 minutes: 7
 xp: 10
 tier: 2
@@ -25,6 +23,26 @@ questions:
   - How does workflow.patched() work?
   - When can I remove a patch?
   - What is Worker Versioning, and how is it different from patching?
+langs:
+  typescript:
+    files:
+    - path: langs/typescript/hello/src/hold.ts
+      editable: true
+    - path: langs/typescript/hello/src/activities.ts
+    hint: "The email step isn't safe yet. Look for the TODO(ch06) for the email in src/hold.ts: run send_hold_email inside if (patched('email-the-hold')), so holds that started before the step replay as they were."
+  java:
+    files:
+      - path: langs/java/hello/src/main/java/hello/FareHoldWorkflowImpl.java
+        editable: true
+      - path: langs/java/hello/src/main/java/hello/FareHoldWorkflow.java
+      - path: langs/java/hello/src/main/java/hello/ActivitiesImpl.java
+    hint: "The email step isn't safe yet. Look for the TODO(ch06) for the email in FareHoldWorkflowImpl.java: send it only when Workflow.getVersion(\"email-the-hold\", Workflow.DEFAULT_VERSION, 1) returns 1, so holds that started before the step replay as they were."
+  dotnet:
+    files:
+      - path: langs/dotnet/hello/FareHoldWorkflow.cs
+        editable: true
+      - path: langs/dotnet/hello/Activities.cs
+    hint: "The email step isn't safe yet. Look for the TODO(ch06) for the email in FareHoldWorkflow.cs: run SendHoldEmailAsync inside if (Workflow.Patched(\"email-the-hold\")), so holds that started before the step replay as they were."
 ---
 
 ## 10. Add a step while a workflow is running
@@ -33,18 +51,61 @@ New requirement: email the traveller when a hold starts. But some holds are alre
 
 Hold seat 14C for two minutes, your hold from before the change:
 
+<!-- lang python -->
 ```bash
 uv run hello-hold 14C 120
 ```
+<!-- /lang -->
+<!-- lang typescript -->
+```bash
+npm run hold -- 14C 120
+```
+<!-- /lang -->
+<!-- lang dotnet -->
+```bash
+./hello hold 14C 120
+```
+<!-- /lang -->
+<!-- lang java -->
+```bash
+./hello hold 14C 120
+```
+<!-- /lang -->
 
+<!-- lang python -->
 Within those two minutes, put the step at the top of `run()` in `hello/hold.py`, in place of the `TODO(ch06)` there:
+<!-- /lang -->
+<!-- lang typescript -->
+Within those two minutes, put the step in `src/hold.ts`, before the wait, in place of the `TODO(ch06)` for the email:
+<!-- /lang -->
+<!-- lang dotnet -->
+Within those two minutes, put the step in `FareHoldWorkflow.cs`, before the wait, in place of the `TODO(ch06)` for the email:
+<!-- /lang -->
+<!-- lang java -->
+Within those two minutes, put the step in `FareHoldWorkflowImpl.java`, before the wait, in place of the `TODO(ch06)` for the email:
+<!-- /lang -->
 
 ```python hello/hold.py
 # The new step: email the traveller that the seat is held.
 await workflow.execute_activity(send_hold_email, hold, start_to_close_timeout=timedelta(seconds=10))
 ```
 
-- Restart the worker, and start a new hold: `uv run hello-hold 15A 20`. The worker's log shows `Emailed the traveller: seat 15A is held for 20s`.
+```typescript langs/typescript/hello/src/hold.ts
+// The new step: email the traveller that the seat is held.
+await send_hold_email(hold);
+```
+
+```java langs/java/hello/src/main/java/hello/FareHoldWorkflowImpl.java
+// The new step: email the traveller that the seat is held.
+activities.sendHoldEmail(hold);
+```
+
+```csharp langs/dotnet/hello/FareHoldWorkflow.cs
+// The new step: email the traveller that the seat is held.
+await Workflow.ExecuteActivityAsync((Activities act) => act.SendHoldEmailAsync(hold), Step);
+```
+
+- Restart the worker, and start a new hold: <!-- lang python -->`uv run hello-hold 15A 20`<!-- /lang --><!-- lang typescript -->`npm run hold -- 15A 20`<!-- /lang --><!-- lang dotnet -->`./hello hold 15A 20`<!-- /lang --><!-- lang java -->`./hello hold 15A 20`<!-- /lang -->. The worker's log shows `Emailed the traveller: seat 15A is held for 20s`.
 - When 14C's two minutes are up, <!-- browser
 [open its Event History](#workflow/hold-14c/history).
 --><!-- local -->open its **Event History**.<!-- /local --> It's still **Running**: after **Timer Fired**, a red **Workflow Task Failed**, with a **nondeterminism** error.
@@ -63,6 +124,36 @@ if workflow.patched("email-the-hold"):
     await workflow.execute_activity(send_hold_email, hold, start_to_close_timeout=timedelta(seconds=10))
 ```
 
-Restart the worker. Within a few seconds 14C's failed task is retried, replays cleanly (no email, as it was), and the hold completes: expired. A new hold, `uv run hello-hold 15A 20`, still sends the email, and its history starts with a **Marker Recorded**: the patch, so a replay knows this run took the new path.
+```typescript langs/typescript/hello/src/hold.ts
+// A step added while holds were already running. patched() is true for a run that reaches this
+// line on the new code, and false when replaying a run that got past it without the step: so an
+// old hold carries on as it was, and every new one sends the email.
+if (patched('email-the-hold')) {
+  await send_hold_email(hold);
+}
+```
 
-Once no running workflow started before the patch, you can drop the old path (`workflow.deprecate_patch`), then the `if`. On a larger system, **Worker Versioning** does this a different way: it keeps old runs on the old workers until they finish.
+```java langs/java/hello/src/main/java/hello/FareHoldWorkflowImpl.java
+// A step added while holds were already running. getVersion records a marker when a run first
+// reaches this line on the new code, and returns 1; replaying a run that got past it without
+// the step, it returns DEFAULT_VERSION: so an old hold carries on as it was, and every new one
+// sends the email.
+int version = Workflow.getVersion("email-the-hold", Workflow.DEFAULT_VERSION, 1);
+if (version == 1) {
+    activities.sendHoldEmail(hold);
+}
+```
+
+```csharp langs/dotnet/hello/FareHoldWorkflow.cs
+// A step added while holds were already running. Patched() is true for a run that reaches
+// this line on the new code, and false when replaying a run that got past it without the
+// step: so an old hold carries on as it was, and every new one sends the email.
+if (Workflow.Patched("email-the-hold"))
+{
+    await Workflow.ExecuteActivityAsync((Activities act) => act.SendHoldEmailAsync(hold), Step);
+}
+```
+
+Restart the worker. Within a few seconds 14C's failed task is retried, replays cleanly (no email, as it was), and the hold completes: expired. A new hold, <!-- lang python -->`uv run hello-hold 15A 20`<!-- /lang --><!-- lang typescript -->`npm run hold -- 15A 20`<!-- /lang --><!-- lang dotnet -->`./hello hold 15A 20`<!-- /lang --><!-- lang java -->`./hello hold 15A 20`<!-- /lang -->, still sends the email, and its history starts with a **Marker Recorded**: the patch, so a replay knows this run took the new path.
+
+Once no running workflow started before the patch, you can drop the old path (<!-- lang python -->`workflow.deprecate_patch`<!-- /lang --><!-- lang typescript -->`deprecatePatch`<!-- /lang --><!-- lang dotnet -->`Workflow.DeprecatePatch`<!-- /lang --><!-- lang java -->raise its oldest version: `getVersion("email-the-hold", 1, 1)`<!-- /lang -->), then the `if`. On a larger system, **Worker Versioning** does this a different way: it keeps old runs on the old workers until they finish.

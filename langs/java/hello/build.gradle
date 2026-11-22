@@ -1,0 +1,30 @@
+// Fundamentals' hello, in Java: the same workflows, on the same wire contract (hello/CONTRACT.md).
+//
+//   ./hello worker               the worker (./hello builds it first: ./gradlew installDist)
+//   ./hello start SFO JFK        a trip, and the other commands in Starter.java
+plugins {
+    id 'application'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'io.temporal:temporal-sdk:1.41.1'
+    // WorkflowReplayer: replaying a history on today's code (Replay.java).
+    implementation 'io.temporal:temporal-testing:1.41.1'
+    // The log (src/main/resources/logback.xml, and LogLine.java): one readable line a message.
+    implementation 'ch.qos.logback:logback-classic:1.5.18'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 21
+    options.compilerArgs << '-Xlint:-options'
+}
+
+application {
+    mainClass = 'hello.Main'
+    // A small JVM that starts fast: the sandbox has 2 GiB for the stack, your worker and a check.
+    applicationDefaultJvmArgs = ['-XX:+UseSerialGC', '-XX:TieredStopAtLevel=1', '-Xmx256m']
+}

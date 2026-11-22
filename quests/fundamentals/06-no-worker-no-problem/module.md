@@ -25,6 +25,21 @@ langs:
       - path: langs/typescript/hello/src/activities.ts
       - path: langs/typescript/hello/src/starter.ts
       - path: langs/typescript/hello/src/board.ts
+  java:
+    files:
+      - path: langs/java/hello/src/main/java/hello/HelloTripWorkflowImpl.java
+        editable: true
+      - path: langs/java/hello/src/main/java/hello/HelloTripWorkflow.java
+      - path: langs/java/hello/src/main/java/hello/ActivitiesImpl.java
+      - path: langs/java/hello/src/main/java/hello/Starter.java
+      - path: langs/java/hello/src/main/java/hello/BoardingWorkflowImpl.java
+  dotnet:
+    files:
+      - path: langs/dotnet/hello/HelloTripWorkflow.cs
+        editable: true
+      - path: langs/dotnet/hello/Activities.cs
+      - path: langs/dotnet/hello/Starter.cs
+      - path: langs/dotnet/hello/BoardingWorkflow.cs
 ---
 
 ## 6. No worker? No problem
@@ -32,7 +47,7 @@ langs:
 A workflow doesn't need a worker to start. Try it:
 
 1. Stop the worker.
-2. Start a trip: <!-- lang python -->`uv run hello-start SEA LHR`<!-- /lang --><!-- lang typescript -->`npm run start -- SEA LHR`<!-- /lang -->. The starter waits for its result.
+2. Start a trip: <!-- lang python -->`uv run hello-start SEA LHR`<!-- /lang --><!-- lang typescript -->`npm run start -- SEA LHR`<!-- /lang --><!-- lang dotnet -->`./hello start SEA LHR`<!-- /lang --><!-- lang java -->`./hello start SEA LHR`<!-- /lang -->. The starter waits for its result.
 3. <!-- local -->Open the link it printed<!-- /local --><!-- browser
 [Open its workflow](#trip/SEA-LHR)
 -->: it's **Running**, recorded in Temporal, with nothing running it.

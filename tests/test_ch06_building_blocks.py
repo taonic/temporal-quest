@@ -237,7 +237,7 @@ STUCK_HOLD = "A hold that started before the email step no longer replays: it wo
 
 async def test_a_hold_from_before_the_email_still_replays():
     if not langs.PYTHON:
-        outcome, output = langs.replay(langs.history("fare_hold_before_the_email"))
+        outcome, output = langs.replay(langs.history("fare_hold_before_the_email"), provided=True)
         if outcome != "ok":
             pytest.fail(f"{STUCK_HOLD} Guard the new step with a patch.\n{output}")
         return

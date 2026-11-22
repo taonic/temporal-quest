@@ -14,12 +14,7 @@ import path from "node:path";
 
 import { Daytona, Image } from "@daytonaio/sdk";
 
-import { LANGUAGE_SNAPSHOT_INPUTS, languageSnapshotName, repoRoot, workshopFiles } from "../runner/repo-files.mjs";
-
-// Per-sandbox resources, a language's own. TypeScript (measured 2026-11-22, ticket 08): the stack,
-// the learner's worker, typescript-language-server and a check together peak at 1.45 GB anon,
-// with no OOM, so 2 GiB, as Python's.
-const RESOURCES = { typescript: { cpu: 1, memory: 2, disk: 5 } };
+import { LANGUAGE_RESOURCES, LANGUAGE_SNAPSHOT_INPUTS, languageSnapshotName, repoRoot, workshopFiles } from "../runner/repo-files.mjs";
 
 function stageContext(language) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), `governance-snapshot-${language}-`));
@@ -67,7 +62,7 @@ async function main() {
   }
   console.log(`Building snapshot ${name} on Daytona (compiling Dogwood takes a while)...`);
   await daytona.snapshot.create(
-    { name, image: Image.fromDockerfile(path.join(context, "Dockerfile")), resources: RESOURCES[language], entrypoint: ["sleep", "infinity"] },
+    { name, image: Image.fromDockerfile(path.join(context, "Dockerfile")), resources: LANGUAGE_RESOURCES[language], entrypoint: ["sleep", "infinity"] },
     { onLogs: (chunk) => process.stdout.write(chunk.endsWith("\n") ? chunk : `${chunk}\n`), timeout: 0 },
   );
   console.log(`\n✓ Snapshot ${name} is ready.`);

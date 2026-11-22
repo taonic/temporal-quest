@@ -218,15 +218,24 @@ def build_language(challenge: Challenge, language: str, versions: dict[str, str]
     apps = {}
     for name, code in versions.items():
         tmp = Path(tempfile.mkdtemp(prefix=f"challenge-{challenge.id.lower()}-{language}-{name.lower()}-"))
-        shutil.copytree(app, tmp, dirs_exist_ok=True,
-                        ignore=shutil.ignore_patterns("node_modules", "bin", "obj", "lib", "*.tsbuildinfo"))
+        # Not its installed packages or build output: each version builds its own.
+        skip = shutil.ignore_patterns("node_modules", "bin", "obj", "lib", "build", ".gradle", "*.tsbuildinfo")
+        shutil.copytree(app, tmp, dirs_exist_ok=True, ignore=skip)
         if (app / "node_modules").exists():
             (tmp / "node_modules").symlink_to(app / "node_modules")
         for path, text in rendered.items():
             (tmp / path).write_text(text)
         where = f"{challenge.id} {language} {name}"
         (tmp / inside).write_text(swap(original, challenge.replace_in(language), code, where))
-        langs.build_app(language, tmp)
+        try:
+            langs.build_app(language, tmp)
+        except langs.LanguageError:
+            # "before" (the file without the block) only some scenarios use (FC3's), and in a typed
+            # language it may not compile (a method left with no return): leave it out.
+            if name != "before":
+                raise
+            shutil.rmtree(tmp, ignore_errors=True)
+            continue
         apps[name.lower()] = tmp
     return apps
 

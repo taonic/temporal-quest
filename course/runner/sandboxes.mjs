@@ -18,22 +18,25 @@ export const TEMPORAL_UI_PORT = 8233;
 export const LSP_PORT = 2087;
 // The language servers' bridges, by language: Python's (jedi) on LSP_PORT, and each other
 // language's (course/snapshot/languages/lsp_stdio_bridge.py), in its snapshot.
-export const LSP_PORTS = { python: LSP_PORT, typescript: 2088 };
+export const LSP_PORTS = { python: LSP_PORT, typescript: 2088, dotnet: 2089 };
 // Where a language's learners work: its terminals open there. Python's is the workshop itself.
 export const languageHome = (language) => (language && language !== "python" ? `${sandboxRepo}/langs/${language}/hello` : sandboxRepo);
 // The language a sandbox was made for (its snapshot's): its label, Python before there were others.
 export const sandboxLanguage = (sandbox) => sandbox?.labels?.language ?? "python";
 // Each worker the poll can find: how pgrep finds it (bracketed, so pgrep doesn't match its own
 // command line), the name the page shows, and the command that starts it (the page compares a
-// worker ▶'s command with it). TypeScript's: `npm run worker` runs tsx on src/worker.ts.
+// worker ▶'s command with it). TypeScript's: `npm run worker` runs tsx on src/worker.ts. Java's:
+// `./hello worker` builds, then runs java on hello.Main. C#'s: the same, then dotnet on Hello.dll.
 const WORKERS = [
   { pattern: "[h]ello-worker", name: "hello-worker", command: "uv run hello-worker" },
   { pattern: "[t]ravel-worker", name: "travel-worker", command: "uv run travel-worker" },
   { pattern: "[t]sx src/worker", name: "hello-worker", command: "npm run worker" },
+  { pattern: "[h]ello.Main worker", name: "hello-worker", command: "./hello worker" },
+  { pattern: "[H]ello.dll worker", name: "hello-worker", command: "./hello worker" },
 ];
 const WORKER_PATTERN = WORKERS.map((w) => w.pattern).join("|");
 // A trip's starter, still waiting for its trip in the commands terminal.
-const STARTER_PATTERN = "[h]ello-start|[t]sx src/starter";
+const STARTER_PATTERN = "[h]ello-start|[t]sx src/starter|[h]ello.Main start|[H]ello.dll start";
 const RUNNING = new Set(["started", "starting", "creating", "restoring", "pulling_snapshot", "resuming"]);
 const GONE = new Set(["destroyed", "destroying", "error", "build_failed"]);
 const BOOTSTRAPPED = ".course/bootstrapped";
@@ -65,13 +68,16 @@ export function isSafePath(rel) {
 // command's process group when it returns, which would take a plain `&` job with it. (Not
 // pgrep: this very command line names the script.)
 // A language's snapshot has its own bridge too (TypeScript's: typescript-language-server, its
-// tsserver capped at 512 MB as a guard), started the same way when it's there.
+// tsserver capped at 512 MB as a guard; C#'s: csharp-ls), started the same way when it's there.
 const START_LSP =
   `{ (: </dev/tcp/127.0.0.1/${LSP_PORT}) 2>/dev/null || ` +
   `setsid -f /opt/lsp/bin/python /opt/lsp/lsp_bridge.py --port ${LSP_PORT} >/tmp/lsp-bridge.log 2>&1 </dev/null; }; ` +
   `if command -v typescript-language-server >/dev/null && ! (: </dev/tcp/127.0.0.1/${LSP_PORTS.typescript}) 2>/dev/null; then ` +
   `setsid -f /opt/lsp/bin/python /opt/lsp/lsp_stdio_bridge.py --port ${LSP_PORTS.typescript} --cwd ${languageHome("typescript")} ` +
-  `--init '{"maxTsServerMemory": 512}' -- typescript-language-server --stdio >/tmp/lsp-bridge-typescript.log 2>&1 </dev/null; fi`;
+  `--init '{"maxTsServerMemory": 512}' -- typescript-language-server --stdio >/tmp/lsp-bridge-typescript.log 2>&1 </dev/null; fi; ` +
+  `if command -v csharp-ls >/dev/null && ! (: </dev/tcp/127.0.0.1/${LSP_PORTS.dotnet}) 2>/dev/null; then ` +
+  `setsid -f /opt/lsp/bin/python /opt/lsp/lsp_stdio_bridge.py --port ${LSP_PORTS.dotnet} --cwd ${languageHome("dotnet")} ` +
+  `-- csharp-ls >/tmp/lsp-bridge-dotnet.log 2>&1 </dev/null; fi`;
 
 // A challenge run's name (FC1-B), checked: it goes into a shell command and a file name.
 export function challengeRun(id, choice) {
@@ -352,7 +358,11 @@ export class SandboxManager {
       return sandbox;
     } catch (err) {
       if (/snapshot/i.test(err.message) && /not found|does not exist/i.test(err.message)) {
-        throw new Error(`The sandbox snapshot ${this.config.snapshot} doesn't exist yet: run node course/snapshot/build.mjs.`);
+        const python = run.language === "python";
+        throw new Error(
+          `The sandbox snapshot ${this.snapshotFor(run.language)} doesn't exist yet: run node course/snapshot/` +
+            (python ? "build.mjs." : `build-language.mjs ${run.language}.`),
+        );
       }
       throw err;
     } finally {

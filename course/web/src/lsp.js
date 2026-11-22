@@ -244,6 +244,9 @@ async function goToDefinition(view, workspace) {
 // exercise has no such file; notOpen(path) says a reference (Shift-F12) is in a file that
 // can't be shown. F12 peeks at such a definition instead (goToDefinition).
 // `language`: whose server (python, or typescript in a TypeScript sandbox).
+// The LSP language id of each language's files, where it isn't the language's own id.
+const LANGUAGE_IDS = { dotnet: "csharp" };
+
 export function createLsp({ openPath, notOpen, ask, canAsk = () => true, language = "python" }) {
   const client = new LSPClient({
     rootUri: ROOT,
@@ -301,7 +304,7 @@ export function createLsp({ openPath, notOpen, ask, canAsk = () => true, languag
   return {
     // The extension for one file's editor state.
     plugin: (path) => [
-      client.plugin(fileUri(path), language),
+      client.plugin(fileUri(path), LANGUAGE_IDS[language] ?? language),
       peekField,
       Prec.high(
         keymap.of([

@@ -8,10 +8,13 @@ order: 1
 classTitle: Durable Apprentice
 worker: uv run hello-worker
 starter: uv run hello-start
-languages: [python, typescript]
+languages: [python, typescript, java, dotnet]
 langs:
-  # TypeScript's learners work in langs/typescript/hello: their terminals open there.
+  # Each language's learners work in its project, langs/<language>/hello: their terminals open there.
   typescript: { worker: npm run worker, starter: npm run start -- }
+  # ./hello builds the Java (or C#) code when it has changed, then runs it.
+  java: { worker: ./hello worker, starter: ./hello start }
+  dotnet: { worker: ./hello worker, starter: ./hello start }
 agentUi: false
 maxWords: 150
 tiers:

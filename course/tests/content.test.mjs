@@ -138,7 +138,9 @@ test("the quests: every module where its branch says, and every module it builds
 
 test("every exercise's TODO block is in its starter, and its snippet replaces it", async () => {
   const { insertMode } = await import("../content/build.mjs");
-  for (const exercise of buildCourse().exercises) {
+  // Each exercise in each of its languages.
+  const versions = buildCourse().exercises.flatMap((ex) => [ex, ...Object.entries(ex.byLang ?? {}).map(([lang, v]) => ({ ...ex, ...v, id: `${ex.id} (${lang})` }))]);
+  for (const exercise of versions) {
     for (const file of exercise.files) {
       for (const todo of file.todos) {
         assert.ok(file.starter.includes(todo.starter), `${exercise.id}: a TODO block isn't in the starter of ${file.path}`);
@@ -551,10 +553,11 @@ test("a branch's languages, and what a module gives each one, are checked", asyn
 test("every branch has its languages, Python where it names none, and every exercise its own", () => {
   const course = buildCourse();
   for (const branch of course.branches) assert.ok(branch.languages?.length, `${branch.id} has no languages`);
-  assert.deepEqual(course.branches.find((b) => b.id === "fundamentals").languages, ["python", "typescript"]);
-  assert.deepEqual(course.languages.map((l) => l.id), ["python", "typescript"], "TypeScript has a whole tier: Fundamentals' first");
+  assert.deepEqual(course.branches.find((b) => b.id === "fundamentals").languages, ["python", "typescript", "java", "dotnet"]);
+  assert.deepEqual(course.languages.map((l) => l.id), ["python", "typescript", "java", "dotnet"], "each has a whole tier: all of Fundamentals");
   for (const exercise of course.exercises) {
-    assert.deepEqual(exercise.languages, exercise.id === "01-hello-temporal" ? ["python", "typescript"] : ["python"], exercise.id);
+    const fundamentals = ["01-hello-temporal", "06-building-blocks"].includes(exercise.id);
+    assert.deepEqual(exercise.languages, fundamentals ? ["python", "typescript", "java", "dotnet"] : ["python"], exercise.id);
   }
 });
 
@@ -579,6 +582,81 @@ test("Hello Temporal in TypeScript: its own commands, files and snippet, and no 
   assert.match(browser, /data-trip="SFO JFK"/, "npm run start -- SFO JFK is a trip button");
   assert.match(browser, /data-insert="langs\/typescript\/hello\/src\/workflows\.ts" data-insert-mode="todo"/, "the snippet replaces the TODO");
   assert.match(browser, /data-file="langs\/typescript\/hello\/src\/board\.ts"/, "src/board.ts in the text opens the file");
-  // Tier 2 isn't in TypeScript yet: the exercise is Python's.
-  assert.deepEqual(buildCourse().exercises.find((e) => e.id === "06-building-blocks").languages, ["python"]);
+});
+
+test("Fundamentals in Java: its own commands, files, snippets and challenges, and no Python or TypeScript", () => {
+  const course = buildCourse();
+  for (const id of ["01-hello-temporal", "06-building-blocks"]) {
+    const java = course.exercises.find((e) => e.id === id).byLang.java;
+    assert.equal(java.worker, "./hello worker");
+    assert.equal(java.starter, "./hello start");
+    assert.equal(java.scripts.check, `quest check ${id}`);
+    assert.ok(java.files.every((f) => f.path.startsWith("langs/java/hello/src/main/java/hello/")), java.files.map((f) => f.path).join(", "));
+    assert.ok(java.tour.every((stop) => stop.file.startsWith("langs/java/")));
+    for (const mode of ["browser", "local"]) {
+      const html = [java.modes[mode].intro, ...java.modes[mode].sections.map((s) => s.html)].join("\n").replace(/<img [^>]*>/g, "");
+      for (const other of [/execute_activity/, /wait_condition/, /uv run hello-/, /hello\/\w+\.py/, /self\./, /\.\/quest /, /npm run/, /\.ts\b/, /proxyActivities/, /patched\(/]) {
+        assert.doesNotMatch(html, other, `${id} ${mode}: Java's guide still says ${other.source}`);
+      }
+      assert.match(html, /\.\/hello worker/);
+    }
+  }
+  const blocks = course.exercises.find((e) => e.id === "06-building-blocks").byLang.java;
+  const browser = blocks.modes.browser.sections.map((s) => s.html).join("\n");
+  assert.match(browser, /data-run="\[&quot;\.\/hello hold 7B 20&quot;\]"/, "a command in prose gets a ▶");
+  assert.match(browser, /data-file="langs\/java\/hello\/src\/main\/java\/hello\/FareHoldWorkflowImpl\.java"/, "a file named from its source folder opens");
+  for (const file of ["FareHoldWorkflowImpl", "ItineraryWorkflowImpl", "BookTripWorkflowImpl", "Replay"]) {
+    assert.match(browser, new RegExp(`data-insert="langs/java/hello/src/main/java/hello/${file}\\.java" data-insert-mode="todo"`), `a snippet replaces ${file}.java's TODO`);
+  }
+  assert.ok(blocks.challenges.FC3.choices.every((c) => !/await workflow|patched\(/.test(c.code)), "FC3's choices are Java");
+});
+
+test("Fundamentals in C#: its own commands, files, snippets and challenges, and no other language's", () => {
+  const course = buildCourse();
+  for (const id of ["01-hello-temporal", "06-building-blocks"]) {
+    const cs = course.exercises.find((e) => e.id === id).byLang.dotnet;
+    assert.equal(cs.worker, "./hello worker");
+    assert.equal(cs.starter, "./hello start");
+    assert.equal(cs.scripts.check, `quest check ${id}`);
+    assert.ok(cs.files.every((f) => f.path.startsWith("langs/dotnet/hello/") && f.path.endsWith(".cs")), cs.files.map((f) => f.path).join(", "));
+    assert.ok(cs.tour.every((stop) => stop.file.startsWith("langs/dotnet/")));
+    for (const mode of ["browser", "local"]) {
+      const html = [cs.modes[mode].intro, ...cs.modes[mode].sections.map((s) => s.html)].join("\n").replace(/<img [^>]*>/g, "");
+      for (const other of [/execute_activity/, /wait_condition/, /uv run hello-/, /hello\/\w+\.py/, /self\./, /\.\/quest /, /npm run/, /\.ts\b/, /\.java\b/, /proxyActivities/, /getVersion/]) {
+        assert.doesNotMatch(html, other, `${id} ${mode}: C#'s guide still says ${other.source}`);
+      }
+    }
+  }
+  const blocks = course.exercises.find((e) => e.id === "06-building-blocks").byLang.dotnet;
+  const browser = blocks.modes.browser.sections.map((s) => s.html).join("\n");
+  for (const file of ["FareHoldWorkflow", "ItineraryWorkflow", "BookTripWorkflow", "Replay"]) {
+    assert.match(browser, new RegExp(`data-insert="langs/dotnet/hello/${file}\\.cs" data-insert-mode="todo"`), `a snippet replaces ${file}.cs's TODO`);
+  }
+  assert.ok(blocks.challenges.FC3.choices.every((c) => /Workflow\./.test(c.code) && !/getVersion|await workflow/.test(c.code)), "FC3's choices are C#");
+});
+
+test("Building blocks in TypeScript: its own commands, files, snippets and challenge, and no Python", () => {
+  const ex = buildCourse().exercises.find((e) => e.id === "06-building-blocks");
+  const ts = ex.byLang.typescript;
+  assert.equal(ts.scripts.check, "quest check 06-building-blocks");
+  assert.ok(ts.files.every((f) => f.path.startsWith("langs/typescript/hello/src/")), ts.files.map((f) => f.path).join(", "));
+  assert.ok(ts.tour.every((stop) => stop.file.startsWith("langs/typescript/")));
+  for (const mode of ["browser", "local"]) {
+    const html = [ts.modes[mode].intro, ...ts.modes[mode].sections.map((s) => s.html)].join("\n").replace(/<img [^>]*>/g, "");
+    for (const python of [/execute_activity/, /wait_condition/, /uv run hello-/, /hello\/\w+\.py/, /self\./, /\.\/quest /, /deprecate_patch/, /is_replaying/, /start_time_skipping/, /\bexcept\b/]) {
+      assert.doesNotMatch(html, python, `${mode}: TypeScript's guide still says ${python.source}`);
+    }
+    for (const command of [/npm run hold -- 12A 20/, /npm run pay -- 12A 4242/, /npm run itinerary -- SFO JFK LHR/, /npm run book -- SFO JFK 0000/, /npm run replay -- hold-14c/]) {
+      assert.match(html, command);
+    }
+  }
+  const browser = ts.modes.browser.sections.map((s) => s.html).join("\n");
+  assert.match(browser, /data-run="\[&quot;npm run hold -- 7B 20&quot;\]"/, "a command in prose gets a ▶");
+  assert.doesNotMatch(browser, /data-run="\[&quot;npm run replay&quot;\]"/, "naming a command isn't running it");
+  for (const file of ["hold", "itinerary", "saga", "replay"]) {
+    assert.match(browser, new RegExp(`data-insert="langs/typescript/hello/src/${file}\\.ts" data-insert-mode="todo"`), `a snippet replaces ${file}.ts's TODO`);
+  }
+  const fc3 = ts.challenges.FC3;
+  assert.ok(fc3, "FC3 is in TypeScript too");
+  assert.ok(fc3.choices.every((c) => !/workflow\.|await workflow/.test(c.code)), "its choices are TypeScript");
 });

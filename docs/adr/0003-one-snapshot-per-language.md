@@ -18,4 +18,5 @@ One image with every toolchain would be much larger, would need a rebuild whenev
 ## Consequences
 
 - Each new or changed toolchain is a snapshot rebuild.
+- A language's snapshot name hashes only what goes into its image: the Python base's inputs, its own Dockerfile, its own size (`LANGUAGE_RESOURCES`) and its hello's package files. Not the shared builder: when it did, sizing Java renamed TypeScript's snapshot, and TypeScript sandboxes failed until it was rebuilt.
 - Raising memory for one language raises the cost of sandboxes for that language's learners only. A lighter stack (Temporal and the console at boot, the rest on demand) is the later optimization.

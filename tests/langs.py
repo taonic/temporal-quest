@@ -233,12 +233,13 @@ async def hello_worker(client, task_queue: str, *, fresh: bool = False, own_acti
             stop(proc)
 
 
-def replay(path: Path) -> tuple[str, str]:
+def replay(path: Path, *, provided: bool = False) -> tuple[str, str]:
     """Replays a history file on the learner's code, in their language: ("ok", output),
-    ("nondeterminism", output), or ("error", output)."""
+    ("nondeterminism", output), or ("error", output). With their replayer (F13's TODO), or with
+    `provided`, the SDK's (for F12, whose check mustn't need F13 solved)."""
     build()
     done = subprocess.run(
-        [*runtime().replay, "--history", str(path)],
+        [*runtime().replay, "--history", str(path), *(["--provided"] if provided else [])],
         cwd=app_root(),
         env={**os.environ, **dict(runtime().env)},
         capture_output=True,

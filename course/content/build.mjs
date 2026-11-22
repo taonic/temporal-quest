@@ -113,7 +113,9 @@ function questCommands(branches, modules) {
 // Inline code that's a command to run as it stands: no <placeholder> to fill in first.
 export function isInlineCommand(text) {
   if (/[<>]/.test(text)) return false;
-  return /^(?:\w+=\S+\s+)*(?:uv run |temporal [a-z]|\.\/quest |cat )/.test(text) || WORKER_COMMAND.test(text) || HELLO_START.test(text);
+  // `npm run hold -- 12A 20` and `./hello hold 12A 20` are; a bare `npm run replay` or `./hello replay`
+  // is naming the command, not running it.
+  return /^(?:\w+=\S+\s+)*(?:uv run |temporal [a-z]|\.\/quest |cat |npm run [\w-]+ -- |\.\/hello [a-z]+ \S)/.test(text) || WORKER_COMMAND.test(text) || HELLO_START.test(text);
 }
 
 // "Stop the worker (Ctrl-C)", "restart the worker", "start the travel agent's worker", "Start
@@ -728,9 +730,11 @@ function createRenderer() {
   md.renderer.rules.code_inline = (tokens, idx, _options, env) => {
     const content = tokens[idx].content;
     // A language's text names its files from its project (`src/workflows.ts`), where its
-    // learners work: the file is that one, in langs/<language>/hello.
+    // learners work, or from its source folder (Java's `FareHoldWorkflowImpl.java`): the file is
+    // that one, in langs/<language>/hello.
     const named = content.replace(/:\d+$/, "");
-    const file = !knownFiles.has(named) && env?.home && knownFiles.has(`${env.home}/${named}`) ? `${env.home}/${named}` : named;
+    const home = knownFiles.has(named) ? undefined : env?.homes?.find((h) => knownFiles.has(`${h}/${named}`));
+    const file = home ? `${home}/${named}` : named;
     const todo = /^TODO\(ch\d+\)$/.test(content);
     const attr = knownFiles.has(file)
       ? ` class="file-ref" data-file="${escapeAttr(file)}"`
@@ -845,6 +849,14 @@ export function renderMaster(masterText, solvedIds) {
   return out.join("");
 }
 
+// Where a language's text names its files from: its project, and where its code is in it.
+const SOURCE_FOLDERS = { java: "src/main/java/hello" };
+function languageHomes(lang) {
+  if (lang === "python") return [];
+  const project = `langs/${lang}/hello`;
+  return [project, ...(SOURCE_FOLDERS[lang] ? [`${project}/${SOURCE_FOLDERS[lang]}`] : [])];
+}
+
 const SNIPPET_FILES = { python: ".py", typescript: ".ts", java: ".java", csharp: ".cs", dogwood: ".dw" };
 
 // How a snippet goes into its file: "todo" replaces the TODO block (it's the solution);
@@ -876,7 +888,7 @@ function readIfExists(rel) {
 // `lang`: the language the page is in, whose project its file names are from.
 function renderPage(md, markdown, mode, sourceFile, files, lang = "python") {
   const { preamble, sections } = splitSections(applyMode(markdown, mode));
-  const env = { mode, sourceFile, files, home: lang === "python" ? "" : `langs/${lang}/hello` };
+  const env = { mode, sourceFile, files, homes: languageHomes(lang) };
   return {
     intro: md.render(preamble, env),
     sections: sections.map((section) => ({

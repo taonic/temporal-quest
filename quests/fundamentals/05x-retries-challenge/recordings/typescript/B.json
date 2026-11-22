@@ -1,5 +1,5 @@
 {
-  "fingerprint": "f40969b22d900a52",
+  "fingerprint": "c9633887dbcf888d",
   "choice": "B",
   "lines": [
     {
@@ -12,31 +12,31 @@
       "type": "step",
       "text": "Started the worker",
       "kind": "worker",
-      "t": 1.4
+      "t": 1.6
     },
     {
       "type": "step",
       "text": "Lookup SFO, attempt 1: 503, the database is overloaded",
       "kind": "bad",
-      "t": 1.5
+      "t": 1.6
     },
     {
       "type": "step",
       "text": "Lookup JFK, attempt 1: found it",
       "kind": "good",
-      "t": 1.5
+      "t": 1.6
     },
     {
       "type": "step",
       "text": "Stopped the worker",
       "kind": "worker",
-      "t": 1.5
+      "t": 1.7
     },
     {
       "type": "step",
       "text": "Completed: Your trip: somewhere (SFO) to New York (JFK).",
       "kind": "bad",
-      "t": 1.5
+      "t": 1.7
     }
   ],
   "done": {
@@ -46,10 +46,10 @@
     "summary": "It finished, with the wrong airport.",
     "result": "Your trip: somewhere (SFO) to New York (JFK).",
     "error": null,
-    "focus": "challenge-fc1-b-cc8c-trip",
+    "focus": "challenge-fc1-b-9dab-trip",
     "events": [
       "Workflow Execution Completed"
     ],
-    "t": 1.5
+    "t": 1.7
   }
 }

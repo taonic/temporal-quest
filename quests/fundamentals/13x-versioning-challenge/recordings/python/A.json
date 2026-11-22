@@ -1,72 +1,72 @@
 {
-  "fingerprint": "52e46f63c7a450b7",
+  "fingerprint": "4e398235ed2870c1",
   "choice": "A",
   "lines": [
     {
       "type": "step",
       "text": "Started the worker, before the email step",
       "kind": "worker",
-      "t": 0.2
+      "t": 0.1
     },
     {
       "type": "step",
       "text": "Held seat 14C for 5 seconds, on the code before the email step.",
       "kind": "info",
-      "t": 0.2
+      "t": 0.1
     },
     {
       "type": "step",
       "text": "Stopped the worker, before the email step",
       "kind": "worker",
-      "t": 0.7
+      "t": 0.6
     },
     {
       "type": "step",
       "text": "Started the worker, with this version",
       "kind": "worker",
-      "t": 0.7
+      "t": 0.6
     },
     {
       "type": "step",
       "text": "Held seat 15A for 3 seconds, on this version.",
       "kind": "info",
-      "t": 0.7
+      "t": 0.6
     },
     {
       "type": "step",
       "text": "Stopped the worker, with this version",
       "kind": "worker",
-      "t": 1.7
+      "t": 1.6
     },
     {
       "type": "step",
       "text": "Restarting the worker: it has to replay both holds.",
       "kind": "info",
-      "t": 1.7
+      "t": 1.6
     },
     {
       "type": "step",
       "text": "Started a new worker",
       "kind": "worker",
-      "t": 1.7
+      "t": 1.6
     },
     {
       "type": "step",
       "text": "14C is stuck: [TMPRL1100] Nondeterminism error: Activity machine does not handle this event: HistoryEven",
       "kind": "bad",
-      "t": 8.7
+      "t": 8.6
     },
     {
       "type": "step",
       "text": "15A: Seat 15A: the hold expired, and the seat is back on sale.",
       "kind": "good",
-      "t": 8.7
+      "t": 8.6
     },
     {
       "type": "step",
       "text": "Stopped the new worker",
       "kind": "worker",
-      "t": 8.7
+      "t": 8.6
     }
   ],
   "done": {
@@ -76,10 +76,10 @@
     "summary": "14C got stuck on replay.",
     "result": null,
     "error": "nondeterminism",
-    "focus": "challenge-fc3-a-8314-hold-14c",
+    "focus": "challenge-fc3-a-0396-hold-14c",
     "events": [
       "14C: Workflow Task Failed: [TMPRL1100] Nondeterminism error: Activity machine does not handle this event: HistoryEvent(id: 5, TimerStarte"
     ],
-    "t": 8.7
+    "t": 8.6
   }
 }

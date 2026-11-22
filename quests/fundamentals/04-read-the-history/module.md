@@ -25,6 +25,21 @@ langs:
       - path: langs/typescript/hello/src/activities.ts
       - path: langs/typescript/hello/src/starter.ts
       - path: langs/typescript/hello/src/board.ts
+  java:
+    files:
+      - path: langs/java/hello/src/main/java/hello/HelloTripWorkflowImpl.java
+        editable: true
+      - path: langs/java/hello/src/main/java/hello/HelloTripWorkflow.java
+      - path: langs/java/hello/src/main/java/hello/ActivitiesImpl.java
+      - path: langs/java/hello/src/main/java/hello/Starter.java
+      - path: langs/java/hello/src/main/java/hello/BoardingWorkflowImpl.java
+  dotnet:
+    files:
+      - path: langs/dotnet/hello/HelloTripWorkflow.cs
+        editable: true
+      - path: langs/dotnet/hello/Activities.cs
+      - path: langs/dotnet/hello/Starter.cs
+      - path: langs/dotnet/hello/BoardingWorkflow.cs
 ---
 
 ## 4. Read what the history remembers

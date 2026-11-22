@@ -365,7 +365,21 @@ export class Learner {
   async cursorOn(text, { select = false } = {}) {
     await this.view("Code");
     const line = this.page.locator(".cm-content .cm-line", { hasText: text }).first();
-    await line.click();
+    // The editor draws only the lines on screen: scroll down a file longer than that until it's drawn.
+    const scroller = this.page.locator(".cm-scroller").first();
+    await scroller.evaluate((el) => el.scrollTo(0, 0));
+    for (let i = 0; i < 40 && !(await line.count()); i++) {
+      await scroller.evaluate((el) => el.scrollBy(0, el.clientHeight * 0.8));
+      await this.page.waitForTimeout(100);
+    }
+    // The cursor is on it once the editor marks it the active line: a click during a scroll can miss.
+    const active = this.page.locator(".cm-content .cm-activeLine", { hasText: text });
+    for (let i = 0; i < 5 && !(await active.count()); i++) {
+      await line.scrollIntoViewIfNeeded();
+      await line.click();
+      await this.page.waitForTimeout(200);
+    }
+    await expect(active, `the cursor isn't on the line "${text}"`).toHaveCount(1);
     await this.page.keyboard.press("Home");
     await this.page.keyboard.press("Home");
     if (select) await this.page.keyboard.press("Shift+End");

@@ -25,6 +25,21 @@ langs:
       - path: langs/typescript/hello/src/activities.ts
       - path: langs/typescript/hello/src/starter.ts
       - path: langs/typescript/hello/src/board.ts
+  java:
+    files:
+      - path: langs/java/hello/src/main/java/hello/HelloTripWorkflowImpl.java
+        editable: true
+      - path: langs/java/hello/src/main/java/hello/HelloTripWorkflow.java
+      - path: langs/java/hello/src/main/java/hello/ActivitiesImpl.java
+      - path: langs/java/hello/src/main/java/hello/Starter.java
+      - path: langs/java/hello/src/main/java/hello/BoardingWorkflowImpl.java
+  dotnet:
+    files:
+      - path: langs/dotnet/hello/HelloTripWorkflow.cs
+        editable: true
+      - path: langs/dotnet/hello/Activities.cs
+      - path: langs/dotnet/hello/Starter.cs
+      - path: langs/dotnet/hello/BoardingWorkflow.cs
 ---
 
 ## 3. Restart the worker, and watch it finish
@@ -42,6 +57,6 @@ Same run, started before your fix, finished after it. **Temporal remembers where
 -->
 <!-- local -->Open the workflow again from the link the starter printed, and click its **Event History** tab.<!-- /local -->
 
-It's **Completed**, with the trip as its **Result**. The events are newest first. Near the bottom, the red **Workflow Task Failed** is your <!-- lang python -->`NotImplementedError`<!-- /lang --><!-- lang typescript -->`TODO(ch01)` error<!-- /lang -->, from before the fix. Everything above it came after the fix, in the same run: the two lookups, then **Workflow Execution Completed**.
+It's **Completed**, with the trip as its **Result**. The events are newest first. Near the bottom, the red **Workflow Task Failed** is your <!-- lang python -->`NotImplementedError`<!-- /lang --><!-- lang typescript -->`TODO(ch01)` error<!-- /lang --><!-- lang dotnet -->`TODO(ch01)` error<!-- /lang --><!-- lang java -->`TODO(ch01)` error<!-- /lang -->, from before the fix. Everything above it came after the fix, in the same run: the two lookups, then **Workflow Execution Completed**.
 
 The bug paused the workflow instead of ending it. Temporal retried the failed step until a worker had working code, and carried on from there. That's durable execution.

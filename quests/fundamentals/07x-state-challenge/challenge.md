@@ -37,6 +37,25 @@ choices:
             onBoard = Math.floor((performance.now() - started) / (pace * 1000));
           }
         explanation: "It never boarded anyone: a workflow has no performance (\"performance is not defined\"), so the workflow task failed, and kept failing. A replay would read a different clock than the first run did, and come to a different count. In a workflow, Date.now() is the time in the history, the same on every replay; here, counting the timers that fired is simpler still."
+      java:
+        code: |
+          // Work the count out from how long boarding has been going.
+          long started = System.currentTimeMillis();
+          while (onBoard < seats) {
+              Workflow.sleep(Duration.ofMillis((long) (pace * 1000)));
+              onBoard = (int) ((System.currentTimeMillis() - started) / (long) (pace * 1000));
+          }
+        explanation: "It boarded the first passenger, then the count fell back to 0 after the restart. The new worker replayed the history later, so System.currentTimeMillis() read another time than the first run did, and the count came out different. Java doesn't stop a workflow reading the machine's clock, but a replay always sees another time. Workflow.currentTimeMillis() is the time in the history; here, counting the timers that fired is simpler still."
+      dotnet:
+        code: |
+          // Work the count out from how long boarding has been going.
+          var started = DateTime.UtcNow;
+          while (onBoard < seats)
+          {
+              await Workflow.DelayAsync(TimeSpan.FromSeconds(pace));
+              onBoard = (int)((DateTime.UtcNow - started).TotalSeconds / pace);
+          }
+        explanation: "It boarded the first passenger, then the count fell back to 0 after the restart. The new worker replayed the history later, so DateTime.UtcNow read another time than the first run did, and the count came out different. .NET doesn't stop a workflow reading the machine's clock, but a replay always sees another time. Workflow.UtcNow is the time in the history; here, counting the timers that fired is simpler still."
   - label: Keep the count to itself
     code: |
       # A local variable: nothing outside run() can touch the count.
@@ -57,6 +76,27 @@ choices:
           }
           onBoard = count;
         explanation: "Boarding was right, and it even survived the restart, but nobody could see it: the query reads onBoard, which stayed 0 until the very end. A worker rebuilds a local as well as anything else; state you want to read has to be where the query looks."
+      java:
+        code: |
+          // A local variable: nothing outside the loop can touch the count.
+          int count = 0;
+          while (count < seats) {
+              Workflow.sleep(Duration.ofMillis((long) (pace * 1000)));
+              count += 1;
+          }
+          onBoard = count;
+        explanation: "Boarding was right, and it even survived the restart, but nobody could see it: the query reads onBoard, which stayed 0 until the very end. A worker rebuilds a local as well as a field; state you want to read has to be where the query looks."
+      dotnet:
+        code: |
+          // A local variable: nothing outside the loop can touch the count.
+          var count = 0;
+          while (count < seats)
+          {
+              await Workflow.DelayAsync(TimeSpan.FromSeconds(pace));
+              count += 1;
+          }
+          onBoard = count;
+        explanation: "Boarding was right, and it even survived the restart, but nobody could see it: the query reads onBoard, which stayed 0 until the very end. A worker rebuilds a local as well as a field; state you want to read has to be where the query looks."
   - label: Count each timer that fires
     right: true
     code: |
@@ -81,6 +121,27 @@ choices:
             // the log picks up at the next passenger instead of counting from 1 again.
             log.info(`Boarded passenger ${onBoard}/${seats}`);
           }
+      java:
+        code: |
+          while (onBoard < seats) {
+              // A durable timer: recorded in the history, so it fires even if the worker that
+              // started it is gone.
+              Workflow.sleep(Duration.ofMillis((long) (pace * 1000)));
+              onBoard += 1;
+              log.info("Boarded passenger {}/{}", onBoard, seats);
+          }
+      dotnet:
+        code: |
+          while (onBoard < seats)
+          {
+              // A durable timer: recorded in the history, so it fires even if the worker that
+              // started it is gone.
+              await Workflow.DelayAsync(TimeSpan.FromSeconds(pace));
+              onBoard += 1;
+              // The workflow's logger stays quiet while a worker replays the history, so after a
+              // restart the log picks up at the next passenger instead of counting from 1 again.
+              Workflow.Logger.LogInformation("Boarded passenger {OnBoard}/{Seats}", onBoard, seats);
+          }
 langs:
   typescript:
     file: langs/typescript/hello/src/board.ts
@@ -94,6 +155,29 @@ langs:
         // the log picks up at the next passenger instead of counting from 1 again.
         log.info(`Boarded passenger ${onBoard}/${seats}`);
       }
+  java:
+    file: langs/java/hello/src/main/java/hello/BoardingWorkflowImpl.java
+    replace: |
+      while (onBoard < seats) {
+          // A durable timer: recorded in the history, so it fires even if the worker that
+          // started it is gone.
+          Workflow.sleep(Duration.ofMillis((long) (pace * 1000)));
+          onBoard += 1;
+          log.info("Boarded passenger {}/{}", onBoard, seats);
+      }
+  dotnet:
+    file: langs/dotnet/hello/BoardingWorkflow.cs
+    replace: |
+      while (onBoard < seats)
+      {
+          // A durable timer: recorded in the history, so it fires even if the worker that
+          // started it is gone.
+          await Workflow.DelayAsync(TimeSpan.FromSeconds(pace));
+          onBoard += 1;
+          // The workflow's logger stays quiet while a worker replays the history, so after a
+          // restart the log picks up at the next passenger instead of counting from 1 again.
+          Workflow.Logger.LogInformation("Boarded passenger {OnBoard}/{Seats}", onBoard, seats);
+      }
 ---
 
-Boarding 3 passengers, one a second, the worker restarts after the first. Which version of the boarding loop in <!-- lang python -->`hello/board.py`<!-- /lang --><!-- lang typescript -->`src/board.ts`<!-- /lang --> keeps a count you can read, through the restart?
+Boarding 3 passengers, one a second, the worker restarts after the first. Which version of the boarding loop in <!-- lang python -->`hello/board.py`<!-- /lang --><!-- lang typescript -->`src/board.ts`<!-- /lang --><!-- lang java -->`BoardingWorkflowImpl.java`<!-- /lang --><!-- lang dotnet -->`BoardingWorkflow.cs`<!-- /lang --> keeps a count you can read, through the restart?

@@ -39,7 +39,8 @@ def build(solved: set[str]) -> Path:
     for name in COPY:
         if (ROOT / name).exists():
             # A language's installed packages are linked, not copied: they're big, and never change.
-            shutil.copytree(ROOT / name, tmp / name, ignore=shutil.ignore_patterns("__pycache__", "node_modules"))
+            skip = shutil.ignore_patterns("__pycache__", "node_modules", "build", ".gradle")
+            shutil.copytree(ROOT / name, tmp / name, ignore=skip)
     for modules_dir in (ROOT / "langs").glob("*/*/node_modules"):
         (tmp / modules_dir.relative_to(ROOT)).symlink_to(modules_dir)
     for name in ["pyproject.toml", "agents.toml"]:
@@ -49,7 +50,8 @@ def build(solved: set[str]) -> Path:
     return tmp
 
 
-async def run_check(solved: set[str], tests: list[str], language: str = "python") -> bool:
+async def run_check(solved: set[str], tests: list[str], language: str = "python") -> tuple[bool, str]:
+    """Whether the check passed, and the tail of what pytest printed (for a case that surprises)."""
     tmp = build(solved)
     # PYTHONPATH puts the rendered copy ahead of the repo's editable install; the Dogwood CLI
     # stays the repo's own build. QUEST_LANG: the language the check runs the code in.
@@ -59,9 +61,10 @@ async def run_check(solved: set[str], tests: list[str], language: str = "python"
     try:
         proc = await asyncio.create_subprocess_exec(
             sys.executable, "-m", "pytest", "-q", "-x", "-p", "no:cacheprovider", *tests,
-            cwd=tmp, env=env, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL,
+            cwd=tmp, env=env, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
         )
-        return await proc.wait() == 0
+        out, _ = await proc.communicate()
+        return proc.returncode == 0, out.decode(errors="replace")[-3000:]
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -146,10 +149,12 @@ async def main() -> None:
             return case, await run_check(case[1], case[2], case[4])
 
     ok = True
-    for (label, solved, _, expected, _language), passed in await asyncio.gather(*map(limited, cases)):
+    for (label, solved, _, expected, _language), (passed, out) in await asyncio.gather(*map(limited, cases)):
         ok &= passed == expected
         mark = "" if passed == expected else "   ! expected " + ("pass" if expected else "FAIL")
         print(f"  {label:<12} {'pass' if passed else 'FAIL'}   solved: {','.join(sorted(solved)) or '-'}{mark}")
+        if passed != expected and not passed:
+            print("    " + out.strip().replace("\n", "\n    "))
     print("\nevery module behaves as expected" if ok else "\n'!' marks a check that didn't")
     sys.exit(0 if ok else 1)
 

@@ -1,0 +1,85 @@
+{
+  "fingerprint": "a1684d7874471ce2",
+  "choice": "A",
+  "lines": [
+    {
+      "type": "step",
+      "text": "Started the worker, before the email step",
+      "kind": "worker",
+      "t": 2.4
+    },
+    {
+      "type": "step",
+      "text": "Held seat 14C for 5 seconds, on the code before the email step.",
+      "kind": "info",
+      "t": 2.4
+    },
+    {
+      "type": "step",
+      "text": "Stopped the worker, before the email step",
+      "kind": "worker",
+      "t": 3.0
+    },
+    {
+      "type": "step",
+      "text": "Started the worker, with this version",
+      "kind": "worker",
+      "t": 3.0
+    },
+    {
+      "type": "step",
+      "text": "Held seat 15A for 3 seconds, on this version.",
+      "kind": "info",
+      "t": 3.0
+    },
+    {
+      "type": "step",
+      "text": "Stopped the worker, with this version",
+      "kind": "worker",
+      "t": 4.0
+    },
+    {
+      "type": "step",
+      "text": "Restarting the worker: it has to replay both holds.",
+      "kind": "info",
+      "t": 4.0
+    },
+    {
+      "type": "step",
+      "text": "Started a new worker",
+      "kind": "worker",
+      "t": 4.0
+    },
+    {
+      "type": "step",
+      "text": "14C is stuck: [TMPRL1100] Nondeterminism error: Activity machine does not handle this event: HistoryEven",
+      "kind": "bad",
+      "t": 11.0
+    },
+    {
+      "type": "step",
+      "text": "15A: Seat 15A: the hold expired, and the seat is back on sale.",
+      "kind": "good",
+      "t": 11.0
+    },
+    {
+      "type": "step",
+      "text": "Stopped the new worker",
+      "kind": "worker",
+      "t": 11.1
+    }
+  ],
+  "done": {
+    "type": "done",
+    "choice": "A",
+    "right": false,
+    "summary": "14C got stuck on replay.",
+    "result": null,
+    "error": "nondeterminism",
+    "focus": "challenge-fc3-a-abe9-hold-14c",
+    "events": [
+      "14C: Workflow Task Failed: [TMPRL1100] Nondeterminism error: Activity machine does not handle this event: HistoryEvent(id: 5, TimerStarte"
+    ],
+    "t": 11.1
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "fingerprint": "71fa695e95aebac8",
+  "choice": "C",
+  "lines": [
+    {
+      "type": "step",
+      "text": "Started boarding SFO→JFK: 3 passengers, one a second.",
+      "kind": "info",
+      "t": 1.9
+    },
+    {
+      "type": "step",
+      "text": "Started the worker",
+      "kind": "worker",
+      "t": 2.6
+    },
+    {
+      "type": "step",
+      "text": "Query before the restart: boarded 1",
+      "kind": "good",
+      "t": 4.2
+    },
+    {
+      "type": "step",
+      "text": "Stopped the worker",
+      "kind": "worker",
+      "t": 4.7
+    },
+    {
+      "type": "step",
+      "text": "Started a new worker",
+      "kind": "worker",
+      "t": 4.7
+    },
+    {
+      "type": "step",
+      "text": "Query after the restart: boarded 2",
+      "kind": "good",
+      "t": 5.4
+    },
+    {
+      "type": "step",
+      "text": "Stopped the new worker",
+      "kind": "worker",
+      "t": 6.8
+    },
+    {
+      "type": "step",
+      "text": "Flight SFO→JFK: 3 passengers boarded.",
+      "kind": "info",
+      "t": 6.8
+    }
+  ],
+  "done": {
+    "type": "done",
+    "choice": "C",
+    "right": true,
+    "summary": "The count read 1, then 2, then finished at 3.",
+    "result": "Flight SFO→JFK: 3 passengers boarded.",
+    "error": null,
+    "focus": "challenge-fc2-c-17d3-board",
+    "events": [
+      "Workflow Execution Completed"
+    ],
+    "t": 6.9
+  }
+}

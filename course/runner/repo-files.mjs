@@ -77,21 +77,40 @@ export function snapshotName(root = repoRoot) {
 
 // A language's snapshot (course/snapshot/build-language.mjs): today's Python one, with that
 // language's toolchain, its hello's packages and a warm build on top. Its name carries a hash of
-// the Python snapshot's inputs and its own (its Dockerfile, the builder, which sizes it, and its
-// hello's package files), so either changing asks for a new one. Python's own name is unchanged.
+// the Python snapshot's inputs and its own (its Dockerfile, its size below, and its hello's
+// package files), so either changing asks for a new one, and changing another language's doesn't.
+// Python's own name is unchanged.
 export const LANGUAGE_SNAPSHOT_INPUTS = {
   // Its lockfile: what's installed (package.json's scripts can change without a new snapshot).
   typescript: ["langs/typescript/hello/package-lock.json"],
+  // Its build: the dependencies and the Gradle that fetches them (the snapshot builds it once).
+  java: ["langs/java/hello/build.gradle", "langs/java/hello/gradle.properties", "langs/java/hello/gradle/wrapper/gradle-wrapper.properties"],
+  // Its project file: its packages (the snapshot restores and builds it once).
+  dotnet: ["langs/dotnet/hello/Hello.csproj"],
+};
+
+// Per-sandbox resources, a language's own. TypeScript (measured 2026-11-22, ticket 08): the stack,
+// the learner's worker, typescript-language-server and a check together peak at 1.45 GB anon,
+// with no OOM, so 2 GiB, as Python's. Java (ticket 02's measurements, without a language server):
+// a check, with its Gradle daemon and JVMs kept small (gradle.properties, build.gradle), fits in
+// 2 GiB beside the stack.
+export const LANGUAGE_RESOURCES = {
+  typescript: { cpu: 1, memory: 2, disk: 5 },
+  java: { cpu: 1, memory: 2, disk: 5 },
+  // C# (ticket 02's measurements): a check took 10.5 s first and 8.6 s warm, inside 2 GiB with the
+  // stack; csharp-ls beside it is measured by the walkthrough.
+  dotnet: { cpu: 1, memory: 2, disk: 5 },
 };
 
 export function languageSnapshotName(language, root = repoRoot) {
   if (language === "python") return snapshotName(root);
   if (!LANGUAGE_SNAPSHOT_INPUTS[language]) throw new Error(`no snapshot for ${language} yet (LANGUAGE_SNAPSHOT_INPUTS)`);
   const hash = crypto.createHash("sha256");
-  const files = [...SNAPSHOT_INPUTS, `course/snapshot/languages/${language}.Dockerfile`, "course/snapshot/languages/lsp_stdio_bridge.py", "course/snapshot/build-language.mjs", ...LANGUAGE_SNAPSHOT_INPUTS[language]];
+  const files = [...SNAPSHOT_INPUTS, `course/snapshot/languages/${language}.Dockerfile`, "course/snapshot/languages/lsp_stdio_bridge.py", ...LANGUAGE_SNAPSHOT_INPUTS[language]];
   for (const file of files) {
     hash.update(`${file}\0`);
     hash.update(fs.readFileSync(path.join(root, file)));
   }
+  hash.update(`resources\0${JSON.stringify(LANGUAGE_RESOURCES[language] ?? null)}`);
   return `governance-course-${language}-${hash.digest("hex").slice(0, 12)}`;
 }

@@ -1,0 +1,5 @@
+#!/bin/sh
+# Build the code if it changed, then run it:   ./hello worker   ./hello start SFO JFK   ...
+cd "$(dirname "$0")" || exit 1
+./gradlew -q installDist || exit 1
+exec build/install/hello/bin/hello "$@"

@@ -1,5 +1,5 @@
 {
-  "fingerprint": "344b7242bba4997c",
+  "fingerprint": "96f2eb132dfaa97b",
   "choice": "A",
   "lines": [
     {
@@ -52,11 +52,11 @@
     "summary": "The trip failed: the lookup ran out of attempts.",
     "result": null,
     "error": "503: the airport database is overloaded (SFO, attempt 3)",
-    "focus": "challenge-fc1-a-f42e-trip",
+    "focus": "challenge-fc1-a-21b8-trip",
     "events": [
       "Activity Task Failed: attempt 3 of 3",
       "Workflow Execution Failed"
     ],
-    "t": 6.3
+    "t": 6.2
   }
 }

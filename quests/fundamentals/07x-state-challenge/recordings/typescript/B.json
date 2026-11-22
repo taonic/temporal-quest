@@ -1,5 +1,5 @@
 {
-  "fingerprint": "f5b9cb63f6855d70",
+  "fingerprint": "2fd0c8b477c2ccc8",
   "choice": "B",
   "lines": [
     {
@@ -12,43 +12,43 @@
       "type": "step",
       "text": "Started the worker",
       "kind": "worker",
-      "t": 1.5
+      "t": 1.1
     },
     {
       "type": "step",
       "text": "Query before the restart: boarded 0",
       "kind": "bad",
-      "t": 3.1
+      "t": 2.7
     },
     {
       "type": "step",
       "text": "Stopped the worker",
       "kind": "worker",
-      "t": 3.2
+      "t": 2.8
     },
     {
       "type": "step",
       "text": "Started a new worker",
       "kind": "worker",
-      "t": 3.2
+      "t": 2.8
     },
     {
       "type": "step",
       "text": "Query after the restart: boarded 0",
       "kind": "bad",
-      "t": 4.4
+      "t": 3.6
     },
     {
       "type": "step",
       "text": "Stopped the new worker",
       "kind": "worker",
-      "t": 5.4
+      "t": 4.6
     },
     {
       "type": "step",
       "text": "Flight SFO→JFK: 3 passengers boarded.",
       "kind": "info",
-      "t": 5.4
+      "t": 4.6
     }
   ],
   "done": {
@@ -58,11 +58,11 @@
     "summary": "The count was right at the end, but the query read 0 all along.",
     "result": "Flight SFO→JFK: 3 passengers boarded.",
     "error": null,
-    "focus": "challenge-fc2-b-4887-board",
+    "focus": "challenge-fc2-b-101f-board",
     "events": [
       "Workflow Execution Completed",
       "Query boarded: 0 while passengers boarded"
     ],
-    "t": 5.4
+    "t": 4.6
   }
 }

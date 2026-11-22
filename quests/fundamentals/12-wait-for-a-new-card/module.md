@@ -4,8 +4,6 @@ title: "Expired card: wait for a new one"
 teaser: "Book with a card that's expired. Instead of undoing the trip, wait for the traveller's new card, take it from the Temporal UI, and turn the wrong one away."
 learn: "Manual retry: a failure a person can fix waits, durably, for the fix, then tries the step again."
 concepts: [non-retryable, wait-condition, update, validator]
-# Not in TypeScript yet (.scratch/multi-language ticket 10).
-languages: [python]
 minutes: 9
 xp: 10
 tier: 2
@@ -26,15 +24,55 @@ questions:
   - Why not give the retry policy more attempts for an expired card?
   - How would I undo the booking if no new card arrives within three days?
   - Should the new card be a Signal or an Update?
+langs:
+  typescript:
+    files:
+    - path: langs/typescript/hello/src/saga.ts
+      editable: true
+    - path: langs/typescript/hello/src/activities.ts
+    - path: langs/typescript/hello/src/starter.ts
+    hint: "Two TODO(ch06)s in src/saga.ts: the loop above the catch (on a CardExpired failure, set waitingForNewCard = true, await condition() until it's false, charge the new card; throw anything else again), and the new_card update with its validator, which turns away the card that expired."
+  java:
+    files:
+      - path: langs/java/hello/src/main/java/hello/BookTripWorkflowImpl.java
+        editable: true
+      - path: langs/java/hello/src/main/java/hello/BookTripWorkflow.java
+      - path: langs/java/hello/src/main/java/hello/ActivitiesImpl.java
+      - path: langs/java/hello/src/main/java/hello/Starter.java
+    hint: "Two TODO(ch06)s in BookTripWorkflowImpl.java: the loop above the catch (on a CardExpired failure, set waitingForNewCard = true, Workflow.await until it's false, charge the new card; throw anything else again), and the new_card update, newCard() and validateNewCard(), which turns away the card that expired."
+  dotnet:
+    files:
+      - path: langs/dotnet/hello/BookTripWorkflow.cs
+        editable: true
+      - path: langs/dotnet/hello/Activities.cs
+      - path: langs/dotnet/hello/Starter.cs
+    hint: "Two TODO(ch06)s in BookTripWorkflow.cs: the loop above the catch (on a CardExpired failure, set waitingForNewCard = true, await Workflow.WaitConditionAsync until it's false, charge the new card; let anything else through), and the new_card update, NewCardAsync and ValidateNewCard, which turns away the card that expired."
 ---
 
 ## 6. An expired card undoes the trip
 
 Book with card `1111`, which has expired:
 
+<!-- lang python -->
 ```bash
 uv run hello-book SFO JFK 1111
 ```
+<!-- /lang -->
+<!-- lang typescript -->
+```bash
+npm run book -- SFO JFK 1111
+```
+<!-- /lang -->
+<!-- lang dotnet -->
+```bash
+./hello book SFO JFK 1111
+```
+<!-- /lang -->
+<!-- lang java -->
+```bash
+./hello book SFO JFK 1111
+```
+<!-- /lang -->
 
 It fails: `card ending 1111 has expired`. The worker's log shows the saga cancelling the hotel, then the flight.
 
@@ -42,7 +80,18 @@ Like a declined card, an expired one is final: no retry brings it back. Unlike a
 
 ## 7. Wait instead
 
+<!-- lang python -->
 In `hello/saga.py`, replace the `TODO(ch06)` above the `except` with:
+<!-- /lang -->
+<!-- lang typescript -->
+In `src/saga.ts`, replace the `TODO(ch06)` above the `catch` with:
+<!-- /lang -->
+<!-- lang dotnet -->
+In `BookTripWorkflow.cs`, replace the `TODO(ch06)` above the `catch` with:
+<!-- /lang -->
+<!-- lang java -->
+In `BookTripWorkflowImpl.java`, replace the `TODO(ch06)` above the `catch` with:
+<!-- /lang -->
 
 ```python hello/saga.py
 # Charge the card. An expired one isn't the end: wait for the traveller's new card,
@@ -59,10 +108,63 @@ while True:
         booking = booking.model_copy(update={"card": self.card})
 ```
 
+```typescript langs/typescript/hello/src/saga.ts
+// Charge the card. An expired one isn't the end: wait for the traveller's new card, for as
+// long as it takes, then charge that. Anything else goes on to the undo below.
+for (;;) {
+  try {
+    await charge_card(booking);
+    break;
+  } catch (err) {
+    if (!(err instanceof ActivityFailure && err.cause instanceof ApplicationFailure && err.cause.type === 'CardExpired')) throw err;
+    waitingForNewCard = true;
+    await condition(() => !waitingForNewCard);
+    booking = { ...booking, card };
+  }
+}
+```
+
+```java langs/java/hello/src/main/java/hello/BookTripWorkflowImpl.java
+// Charge the card. An expired one isn't the end: wait for the traveller's new card, for as
+// long as it takes, then charge that. Anything else goes on to the undo below.
+while (true) {
+    try {
+        activities.chargeCard(booking);
+        break;
+    } catch (ActivityFailure err) {
+        if (!(err.getCause() instanceof ApplicationFailure failure && failure.getType().equals("CardExpired"))) {
+            throw err;
+        }
+        waitingForNewCard = true;
+        Workflow.await(() -> !waitingForNewCard);
+        booking = new Booking(booking.origin(), booking.destination(), card);
+    }
+}
+```
+
+```csharp langs/dotnet/hello/BookTripWorkflow.cs
+// Charge the card. An expired one isn't the end: wait for the traveller's new card, for as
+// long as it takes, then charge that. Anything else goes on to the undo below.
+while (true)
+{
+    try
+    {
+        await Workflow.ExecuteActivityAsync((Activities act) => act.ChargeCardAsync(booking), Step);
+        break;
+    }
+    catch (ActivityFailureException err) when (err.InnerException is ApplicationFailureException { ErrorType: "CardExpired" })
+    {
+        waitingForNewCard = true;
+        await Workflow.WaitConditionAsync(() => !waitingForNewCard);
+        booking = booking with { Card = card };
+    }
+}
+```
+
 On `CardExpired`, it sets a flag and waits until something clears it. Any other error goes on to the saga.
 
 - Restart the worker.
-- Book with `1111` again: `uv run hello-book SFO JFK 1111`. Nothing is undone, and the command says the booking is waiting for a new card.
+- Book with `1111` again: <!-- lang python -->`uv run hello-book SFO JFK 1111`<!-- /lang --><!-- lang typescript -->`npm run book -- SFO JFK 1111`<!-- /lang --><!-- lang dotnet -->`./hello book SFO JFK 1111`<!-- /lang --><!-- lang java -->`./hello book SFO JFK 1111`<!-- /lang -->. Nothing is undone, and the command says the booking is waiting for a new card.
 - <!-- browser
 [Open its history](#workflow/book-sfo-jfk/history):
 --><!-- local -->Open it in the Temporal UI:<!-- /local --> the flight and the hotel are reserved, `charge_card` failed, and then nothing.
@@ -71,7 +173,7 @@ There's no timer and no retry. The booking is **Running**, and it would wait the
 
 ## 8. Take the new card, not the wrong one
 
-Replace the `TODO(ch06)` for `new_card` with an Update and its validator, like the hold's `pay`:
+Replace the `TODO(ch06)` for `new_card` in <!-- lang python -->`hello/saga.py`<!-- /lang --><!-- lang typescript -->`src/saga.ts`<!-- /lang --><!-- lang dotnet -->`BookTripWorkflow.cs`<!-- /lang --><!-- lang java -->`BookTripWorkflowImpl.java`<!-- /lang --> with an Update and its validator, like the hold's `pay`:
 
 ```python hello/saga.py
 # An update: the traveller's new card. It clears the flag the charge loop waits on.
@@ -90,6 +192,71 @@ def check_new_card(self, payment: Payment) -> None:
         raise ValueError(f"give the card's last four digits, not {payment.card!r}")
     if payment.card == self.card:
         raise ValueError(f"the card ending {payment.card} is the one that expired")
+```
+
+```typescript langs/typescript/hello/src/saga.ts
+// The new_card update: it clears the flag the charge loop waits on. Its validator runs first,
+// and a card it turns away is never written to the history.
+setHandler(
+  newCard,
+  (payment) => {
+    card = payment.card;
+    waitingForNewCard = false;
+    return `Charging the card ending ${payment.card}.`;
+  },
+  {
+    validator: (payment) => {
+      if (!waitingForNewCard) throw new Error("this booking isn't waiting for a new card");
+      if (!/^\d{4}$/.test(payment.card)) throw new Error(`give the card's last four digits, not '${payment.card}'`);
+      if (payment.card === card) throw new Error(`the card ending ${payment.card} is the one that expired`);
+    },
+  },
+);
+```
+
+```java langs/java/hello/src/main/java/hello/BookTripWorkflowImpl.java
+// The new_card update: it clears the flag the charge loop waits on.
+@Override
+public String newCard(Payment payment) {
+    card = payment.card();
+    waitingForNewCard = false;
+    return "Charging the card ending " + payment.card() + ".";
+}
+
+// Its validator runs first, and a card it turns away is never written to the history.
+@Override
+public void validateNewCard(Payment payment) {
+    if (!waitingForNewCard) throw new IllegalStateException("this booking isn't waiting for a new card");
+    if (!payment.card().matches("\\d{4}")) {
+        throw new IllegalArgumentException("give the card's last four digits, not '" + payment.card() + "'");
+    }
+    if (payment.card().equals(card)) {
+        throw new IllegalArgumentException("the card ending " + payment.card() + " is the one that expired");
+    }
+}
+```
+
+```csharp langs/dotnet/hello/BookTripWorkflow.cs
+// The new_card update: it clears the flag the charge loop waits on.
+[WorkflowUpdate("new_card")]
+public Task<string> NewCardAsync(Payment payment)
+{
+    card = payment.Card;
+    waitingForNewCard = false;
+    return Task.FromResult($"Charging the card ending {payment.Card}.");
+}
+
+// Its validator runs first, and a card it turns away is never written to the history.
+[WorkflowUpdateValidator(nameof(NewCardAsync))]
+public void ValidateNewCard(Payment payment)
+{
+    if (!waitingForNewCard) throw new InvalidOperationException("this booking isn't waiting for a new card");
+    if (payment.Card.Length != 4 || !payment.Card.All(char.IsAsciiDigit))
+    {
+        throw new ArgumentException($"give the card's last four digits, not '{payment.Card}'");
+    }
+    if (payment.Card == card) throw new ArgumentException($"the card ending {payment.Card} is the one that expired");
+}
 ```
 
 Without the validator, the same expired card would be taken, charged, and fail again.
@@ -123,4 +290,6 @@ There's no event for `1111`: the validator turned it away before anything was wr
 | The card is declined | No | A saga undoes what's done |
 | The card has expired, an account number has a typo | Yes, once a person fixes it | It waits for the fix, then tries again |
 
-In production you'd bound the wait: `wait_condition(..., timeout=timedelta(days=3))` is a durable timer, like the fare hold's, and when it runs out, raising the original error hands the trip to the saga.
+<!-- lang python -->In production you'd bound the wait: `wait_condition(..., timeout=timedelta(days=3))` is a durable timer, like the fare hold's, and when it runs out, raising the original error hands the trip to the saga.<!-- /lang --><!-- lang typescript -->In production you'd bound the wait: `condition(() => ..., '3 days')` is a durable timer, like the fare hold's, and when it returns `false`, throwing the original error hands the trip to the saga.<!-- /lang -->
+<!-- lang dotnet -->In production you'd bound the wait: `Workflow.WaitConditionAsync(() => ..., TimeSpan.FromDays(3))` is a durable timer, like the fare hold's, and when it returns `false`, throwing the original failure hands the trip to the saga.<!-- /lang -->
+<!-- lang java -->In production you'd bound the wait: `Workflow.await(Duration.ofDays(3), () -> ...)` is a durable timer, like the fare hold's, and when it returns `false`, throwing the original failure hands the trip to the saga. Step 5's saga is written out by hand; the SDK's `Saga` class keeps the same list of undos for you (`addCompensation`, then `compensate()`).<!-- /lang -->

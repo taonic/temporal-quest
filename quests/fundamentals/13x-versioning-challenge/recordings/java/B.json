@@ -1,0 +1,85 @@
+{
+  "fingerprint": "776adf063f15ae51",
+  "choice": "B",
+  "lines": [
+    {
+      "type": "step",
+      "text": "Started the worker, before the email step",
+      "kind": "worker",
+      "t": 2.5
+    },
+    {
+      "type": "step",
+      "text": "Held seat 14C for 5 seconds, on the code before the email step.",
+      "kind": "info",
+      "t": 2.5
+    },
+    {
+      "type": "step",
+      "text": "Stopped the worker, before the email step",
+      "kind": "worker",
+      "t": 3.4
+    },
+    {
+      "type": "step",
+      "text": "Started the worker, with this version",
+      "kind": "worker",
+      "t": 3.4
+    },
+    {
+      "type": "step",
+      "text": "Held seat 15A for 3 seconds, on this version.",
+      "kind": "info",
+      "t": 3.4
+    },
+    {
+      "type": "step",
+      "text": "Stopped the worker, with this version",
+      "kind": "worker",
+      "t": 4.9
+    },
+    {
+      "type": "step",
+      "text": "Restarting the worker: it has to replay both holds.",
+      "kind": "info",
+      "t": 4.9
+    },
+    {
+      "type": "step",
+      "text": "Started a new worker",
+      "kind": "worker",
+      "t": 4.9
+    },
+    {
+      "type": "step",
+      "text": "14C: Seat 14C: the hold expired, and the seat is back on sale.",
+      "kind": "good",
+      "t": 7.7
+    },
+    {
+      "type": "step",
+      "text": "15A is stuck: [TMPRL1100] Failure handling event 5 of type 'EVENT_TYPE_ACTIVITY_TASK_SCHEDULED' during r",
+      "kind": "bad",
+      "t": 14.7
+    },
+    {
+      "type": "step",
+      "text": "Stopped the new worker",
+      "kind": "worker",
+      "t": 15.1
+    }
+  ],
+  "done": {
+    "type": "done",
+    "choice": "B",
+    "right": false,
+    "summary": "15A got stuck on replay.",
+    "result": null,
+    "error": "nondeterminism",
+    "focus": "challenge-fc3-b-0d93-hold-15a",
+    "events": [
+      "15A: Workflow Task Failed: [TMPRL1100] Failure handling event 5 of type 'EVENT_TYPE_ACTIVITY_TASK_SCHEDULED' during replay. [TMPRL1100] E"
+    ],
+    "t": 15.2
+  }
+}

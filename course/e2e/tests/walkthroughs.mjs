@@ -36,6 +36,8 @@ async function ask(l, text, did, { nudge = "Please go ahead and do it now.", ...
 const HELLO = {
   python: { file: "hello/workflow.py", flaky: "FLAKY=1 uv run hello-worker", board: "uv run hello-board SFO JFK", worker: "hello-worker" },
   typescript: { file: "langs/typescript/hello/src/workflows.ts", flaky: "FLAKY=1 npm run worker", board: "npm run board -- SFO JFK", worker: "npm run worker" },
+  java: { file: "langs/java/hello/src/main/java/hello/HelloTripWorkflowImpl.java", flaky: "FLAKY=1 ./hello worker", board: "./hello board SFO JFK", worker: "./hello worker" },
+  dotnet: { file: "langs/dotnet/hello/HelloTripWorkflow.cs", flaky: "FLAKY=1 ./hello worker", board: "./hello board SFO JFK", worker: "./hello worker" },
 };
 
 // --- 1 · Hello Temporal, in a language ---------------------------------------------------------
@@ -101,11 +103,183 @@ const helloTemporal = (lang) =>
     await l.check("01-hello-temporal");
   };
 
+// What differs in Building blocks between its languages: its files, its commands, and the lines
+// step 10 puts the cursor on.
+const command = (run) => (args) => `${run} ${args}`;
+const BLOCKS = {
+  python: {
+    files: { hold: "hello/hold.py", itinerary: "hello/itinerary.py", saga: "hello/saga.py", replay: "hello/replay.py" },
+    ...Object.fromEntries(["hold", "pay", "itinerary", "book", "replay"].map((c) => [c, command(`uv run hello-${c}`)])),
+    emailTodo: "# TODO(ch06): email the traveller",
+    emailStep: "await workflow.execute_activity(send_hold_email",
+  },
+  typescript: {
+    files: Object.fromEntries(["hold", "itinerary", "saga", "replay"].map((f) => [f, `langs/typescript/hello/src/${f}.ts`])),
+    ...Object.fromEntries(["hold", "pay", "itinerary", "book", "replay"].map((c) => [c, command(`npm run ${c} --`)])),
+    emailTodo: "// TODO(ch06): email the traveller",
+    emailStep: "await send_hold_email(hold);",
+  },
+  java: {
+    files: {
+      hold: "langs/java/hello/src/main/java/hello/FareHoldWorkflowImpl.java",
+      itinerary: "langs/java/hello/src/main/java/hello/ItineraryWorkflowImpl.java",
+      saga: "langs/java/hello/src/main/java/hello/BookTripWorkflowImpl.java",
+      replay: "langs/java/hello/src/main/java/hello/Replay.java",
+    },
+    ...Object.fromEntries(["hold", "pay", "itinerary", "book", "replay"].map((c) => [c, command(`./hello ${c}`)])),
+    emailTodo: "// TODO(ch06): email the traveller",
+    emailStep: "activities.sendHoldEmail(hold);",
+  },
+  dotnet: {
+    files: Object.fromEntries(
+      [["hold", "FareHoldWorkflow"], ["itinerary", "ItineraryWorkflow"], ["saga", "BookTripWorkflow"], ["replay", "Replay"]].map(([k, f]) => [k, `langs/dotnet/hello/${f}.cs`]),
+    ),
+    ...Object.fromEntries(["hold", "pay", "itinerary", "book", "replay"].map((c) => [c, command(`./hello ${c}`)])),
+    emailTodo: "// TODO(ch06): email the traveller",
+    emailStep: "await Workflow.ExecuteActivityAsync((Activities act) => act.SendHoldEmailAsync(hold), Step);",
+  },
+};
+
+// --- 6 · Building blocks, in a language ---------------------------------------------------------
+const buildingBlocks = (lang) =>
+  async (l) => {
+    await l.startOver("06-building-blocks");
+
+    await l.step("Hold a seat");
+    await l.openFile(lang.files.hold);
+    await l.insert();
+    // "Restart the worker": the step's restart starts it, stopped as it is after Start over.
+    await l.restartWorker();
+    expect(await l.runButton(lang.hold("12A 20")), "hello-hold didn't start the hold").toBe(0);
+    await l.openInTemporal("button[data-workflow-open]");
+    await expect(l.temporal.getByText("Running", { exact: true }).first(), "the hold should be Running while it waits").toBeVisible({ timeout: 30 * SECOND });
+    await untilStatus(l, "hold-12a-", "Completed", "the hold didn't run out after its 20 seconds");
+    await l.view("Code");
+
+    await l.step("Let it run out with no worker");
+    expect(await l.runButton(lang.hold("7B 20")), "hello-hold didn't start the hold").toBe(0);
+    await l.worker("stopped");
+    await sleep(30 * SECOND);
+    await l.openInTemporal("button[data-workflow-open]");
+    await expect(l.temporal.getByText(/Timer ?Fired/i).first(), "the timer didn't fire while no worker was running").toBeVisible({ timeout: 30 * SECOND });
+    await expect(l.temporal.getByText("Running", { exact: true }).first(), "with no worker, the hold should still be Running past its timer").toBeVisible();
+    await l.view("Code");
+    await l.worker("running");
+    await untilStatus(l, "hold-7b-", "Completed", "the hold didn't finish once the worker was back");
+    await l.view("Code");
+
+    await l.step("Pay for it");
+    await l.openFile(lang.files.hold);
+    await l.insert();
+    await l.restartWorker();
+    expect(await l.runButton(lang.hold("12A 120")), "hello-hold didn't start the hold").toBe(0);
+    expect(await l.runButton(lang.pay("12A 12ab")), "a card that isn't four digits should be refused").not.toBe(0);
+    expect(l.output, "the validator didn't say why it refused the card").toContain("give the card's last four digits");
+    expect(await l.runButton(lang.pay("12A 4242")), "paying with a good card failed").toBe(0);
+    expect(l.output).toContain("Paid for seat 12A.");
+    await l.openInTemporal("button[data-workflow-open]");
+    await expect(l.temporal.getByText(/Update Completed/i).first(), "the history has no completed update").toBeVisible({ timeout: 30 * SECOND });
+    await untilStatus(l, "hold-12a-", "Completed", "paying didn't end the hold");
+    await l.view("Code");
+
+    await l.step("One trip, several legs");
+    await l.openFile(lang.files.itinerary);
+    await l.insert();
+    await l.restartWorker();
+    expect(await l.runButton(lang.itinerary("SFO JFK LHR")), "the itinerary failed").toBe(0);
+    expect(l.flatOutput, "the itinerary didn't print both legs").toContain("London (LHR)");
+    await l.openInTemporal("button[data-workflow-open]");
+    await expect(l.temporal.getByText(/Child Workflow Execution Completed/i).first(), "the itinerary's history has no completed child").toBeVisible({ timeout: 30 * SECOND });
+    await l.view("Code");
+
+    await l.step("Undo a booking");
+    expect(await l.runButton(lang.book("SFO JFK 0000")), "a declined card should fail the booking").not.toBe(0);
+    await l.sawInTerminal("worker", "Reserved hotel HT-JFK", "the booking reserved no hotel before the card");
+    await l.openFile(lang.files.saga);
+    await l.insert();
+    await l.restartWorker();
+    expect(await l.runButton(lang.book("SFO JFK 0000")), "a declined card should still fail the booking").not.toBe(0);
+    await l.sawInTerminal("worker", "Cancelled hotel HT-JFK", "the saga didn't cancel the hotel");
+    await l.sawInTerminal("worker", "Cancelled flight FL-SFOJFK", "the saga didn't cancel the flight");
+    expect(await l.runButton(lang.book("SFO JFK 4242")), "a good card should book the trip").toBe(0);
+
+    await l.step("An expired card undoes the trip");
+    expect(await l.runButton(lang.book("SFO JFK 1111")), "before the TODOs, an expired card should fail the booking").not.toBe(0);
+    expect(l.output, "the booking didn't fail on the expired card").toContain("has expired");
+
+    await l.step("Wait instead");
+    await l.openFile(lang.files.saga);
+    await l.insert();
+    await l.restartWorker();
+    expect(await l.runButton(lang.book("SFO JFK 1111")), "an expired card should leave the booking waiting").toBe(0);
+    expect(l.flatOutput, "hello-book didn't say the booking is waiting").toContain("waiting for a new one");
+
+    await l.step("Take the new card, not the wrong one");
+    await l.openFile(lang.files.saga);
+    await l.insert();
+    await l.restartWorker();
+    await submitNewCard(l, "1111");
+    await expect(l.temporal.getByRole("dialog").getByText("the card ending 1111 is the one that expired").first(), "the validator didn't turn the expired card away").toBeVisible({ timeout: 30 * SECOND });
+    await submitNewCard(l, "4242");
+    await expect(l.temporal.getByText("Update successful").first(), "the new card's Update didn't succeed").toBeVisible({ timeout: 30 * SECOND });
+    await untilStatus(l, "book-sfo-jfk-", "Completed", "the new card didn't complete the booking");
+    await l.view("Code");
+
+    await l.step("Read what the Update did");
+    await l.openInTemporal("button[data-workflow-open]");
+    await expect(l.temporal.getByText(/Workflow Execution Update Accepted/i).first(), "the history has no accepted Update").toBeVisible({ timeout: 30 * SECOND });
+    await expect(l.temporal.getByText(/Activity Task Failed/i).first(), "the history has no failed charge").toBeVisible();
+    await l.view("Code");
+
+    await l.step("Add a step while a workflow is running");
+    expect(await l.runButton(lang.hold("14C 120")), "hello-hold didn't start 14C").toBe(0);
+    const heldAt = Date.now();
+    await l.openFile(lang.files.hold);
+    // "in place of the TODO(ch06) there": its snippet goes in at the cursor, on the TODO's line.
+    await l.cursorOn(lang.emailTodo, { select: true });
+    await l.insert();
+    await l.restartWorker();
+    expect(await l.runButton(lang.hold("15A 20")), "hello-hold didn't start 15A").toBe(0);
+    await l.sawInTerminal("worker", "Emailed the traveller: seat 15A", "the new hold sent no email");
+    // 14C's two minutes, and a moment for its timer's task to fail on the new code.
+    await sleep(Math.max(0, heldAt + 2 * MINUTE + 10 * SECOND - Date.now()));
+    await l.openInTemporal("button[data-workflow-open]");
+    await expect(l.temporal.getByText(/Workflow Task Failed/i).first(), "14C didn't fail its task on the new code").toBeVisible({ timeout: 30 * SECOND });
+    // Java's says it by its code: [TMPRL1100] … does not match … during replay.
+    await expect(l.temporal.getByText(/nondetermin|TMPRL1100/i).first(), "14C's failed task isn't a nondeterminism error").toBeVisible({ timeout: 30 * SECOND });
+    await l.view("Code");
+
+    await l.step("Patch it");
+    // "Replace your line with": the line step 6 put in.
+    await l.cursorOn(lang.emailStep, { select: true });
+    await l.insert();
+    await l.restartWorker();
+    // 14C is still on show in the Temporal UI: its failed task is retried, and it completes.
+    await untilStatus(l, "hold-14c-", "Completed", "14C didn't complete on the patched code");
+    await l.view("Code");
+    const emailed = await l.countInTerminal("worker", "Emailed the traveller: seat 15A");
+    expect(await l.runButton(lang.hold("15A 20")), "hello-hold didn't start 15A").toBe(0);
+    await l.sawInTerminal("worker", "Emailed the traveller: seat 15A", "a new hold on the patched code sent no email", { moreThan: emailed });
+
+    await l.step("Replay it first");
+    await l.openFile(lang.files.replay);
+    await l.insert();
+    expect(await l.runButton(lang.replay("hold-14c")), "the replays failed").toBe(0);
+    expect(l.flatOutput, "14C didn't replay on this code").toMatch(/✓ hold-14c-\w+ replays on this code/);
+    expect(l.flatOutput, "15A didn't replay on this code").toMatch(/✓ hold-15a-\w+ replays on this code/);
+    await l.step("Catch a teammate's change");
+    // Not done here: deleting the email step by hand, and replaying again to see 15A fail.
+
+    await l.check("06-building-blocks");
+  };
+
 // Each exercise in a language other than Python, by language: walked by a learner who builds in
 // it (?lang=), in a sandbox from its snapshot. Tagged @typescript…: nightly, and after a deploy
 // that changes that language's code (e2e.yml).
 export const LANGUAGE_WALKTHROUGHS = {
-  typescript: { "01-hello-temporal": helloTemporal(HELLO.typescript) },
+  typescript: { "01-hello-temporal": helloTemporal(HELLO.typescript), "06-building-blocks": buildingBlocks(BLOCKS.typescript) },
+  java: { "01-hello-temporal": helloTemporal(HELLO.java), "06-building-blocks": buildingBlocks(BLOCKS.java) },
+  dotnet: { "01-hello-temporal": helloTemporal(HELLO.dotnet), "06-building-blocks": buildingBlocks(BLOCKS.dotnet) },
 };
 
 export const WALKTHROUGHS = {
@@ -362,136 +536,7 @@ export const WALKTHROUGHS = {
     await l.check("05-auto-mode");
   },
 
-  // --- 6 · Building blocks --------------------------------------------------------------------
-  "06-building-blocks": async (l) => {
-    await l.startOver("06-building-blocks");
-
-    await l.step("Hold a seat");
-    await l.openFile("hello/hold.py");
-    await l.insert();
-    // "Restart the worker": the step's restart starts it, stopped as it is after Start over.
-    await l.restartWorker();
-    expect(await l.runButton("uv run hello-hold 12A 20"), "hello-hold didn't start the hold").toBe(0);
-    await l.openInTemporal("button[data-workflow-open]");
-    await expect(l.temporal.getByText("Running", { exact: true }).first(), "the hold should be Running while it waits").toBeVisible({ timeout: 30 * SECOND });
-    await untilStatus(l, "hold-12a-", "Completed", "the hold didn't run out after its 20 seconds");
-    await l.view("Code");
-
-    await l.step("Let it run out with no worker");
-    expect(await l.runButton("uv run hello-hold 7B 20"), "hello-hold didn't start the hold").toBe(0);
-    await l.worker("stopped");
-    await sleep(30 * SECOND);
-    await l.openInTemporal("button[data-workflow-open]");
-    await expect(l.temporal.getByText(/Timer ?Fired/i).first(), "the timer didn't fire while no worker was running").toBeVisible({ timeout: 30 * SECOND });
-    await expect(l.temporal.getByText("Running", { exact: true }).first(), "with no worker, the hold should still be Running past its timer").toBeVisible();
-    await l.view("Code");
-    await l.worker("running");
-    await untilStatus(l, "hold-7b-", "Completed", "the hold didn't finish once the worker was back");
-    await l.view("Code");
-
-    await l.step("Pay for it");
-    await l.openFile("hello/hold.py");
-    await l.insert();
-    await l.restartWorker();
-    expect(await l.runButton("uv run hello-hold 12A 120"), "hello-hold didn't start the hold").toBe(0);
-    expect(await l.runButton("uv run hello-pay 12A 12ab"), "a card that isn't four digits should be refused").not.toBe(0);
-    expect(l.output, "the validator didn't say why it refused the card").toContain("give the card's last four digits");
-    expect(await l.runButton("uv run hello-pay 12A 4242"), "paying with a good card failed").toBe(0);
-    expect(l.output).toContain("Paid for seat 12A.");
-    await l.openInTemporal("button[data-workflow-open]");
-    await expect(l.temporal.getByText(/Update Completed/i).first(), "the history has no completed update").toBeVisible({ timeout: 30 * SECOND });
-    await untilStatus(l, "hold-12a-", "Completed", "paying didn't end the hold");
-    await l.view("Code");
-
-    await l.step("One trip, several legs");
-    await l.openFile("hello/itinerary.py");
-    await l.insert();
-    await l.restartWorker();
-    expect(await l.runButton("uv run hello-itinerary SFO JFK LHR"), "the itinerary failed").toBe(0);
-    expect(l.flatOutput, "the itinerary didn't print both legs").toContain("London (LHR)");
-    await l.openInTemporal("button[data-workflow-open]");
-    await expect(l.temporal.getByText(/Child Workflow Execution Completed/i).first(), "the itinerary's history has no completed child").toBeVisible({ timeout: 30 * SECOND });
-    await l.view("Code");
-
-    await l.step("Undo a booking");
-    expect(await l.runButton("uv run hello-book SFO JFK 0000"), "a declined card should fail the booking").not.toBe(0);
-    await l.sawInTerminal("worker", "Reserved hotel HT-JFK", "the booking reserved no hotel before the card");
-    await l.openFile("hello/saga.py");
-    await l.insert();
-    await l.restartWorker();
-    expect(await l.runButton("uv run hello-book SFO JFK 0000"), "a declined card should still fail the booking").not.toBe(0);
-    await l.sawInTerminal("worker", "Cancelled hotel HT-JFK", "the saga didn't cancel the hotel");
-    await l.sawInTerminal("worker", "Cancelled flight FL-SFOJFK", "the saga didn't cancel the flight");
-    expect(await l.runButton("uv run hello-book SFO JFK 4242"), "a good card should book the trip").toBe(0);
-
-    await l.step("An expired card undoes the trip");
-    expect(await l.runButton("uv run hello-book SFO JFK 1111"), "before the TODOs, an expired card should fail the booking").not.toBe(0);
-    expect(l.output, "the booking didn't fail on the expired card").toContain("has expired");
-
-    await l.step("Wait instead");
-    await l.openFile("hello/saga.py");
-    await l.insert();
-    await l.restartWorker();
-    expect(await l.runButton("uv run hello-book SFO JFK 1111"), "an expired card should leave the booking waiting").toBe(0);
-    expect(l.flatOutput, "hello-book didn't say the booking is waiting").toContain("waiting for a new one");
-
-    await l.step("Take the new card, not the wrong one");
-    await l.openFile("hello/saga.py");
-    await l.insert();
-    await l.restartWorker();
-    await submitNewCard(l, "1111");
-    await expect(l.temporal.getByRole("dialog").getByText("the card ending 1111 is the one that expired").first(), "the validator didn't turn the expired card away").toBeVisible({ timeout: 30 * SECOND });
-    await submitNewCard(l, "4242");
-    await expect(l.temporal.getByText("Update successful").first(), "the new card's Update didn't succeed").toBeVisible({ timeout: 30 * SECOND });
-    await untilStatus(l, "book-sfo-jfk-", "Completed", "the new card didn't complete the booking");
-    await l.view("Code");
-
-    await l.step("Read what the Update did");
-    await l.openInTemporal("button[data-workflow-open]");
-    await expect(l.temporal.getByText(/Workflow Execution Update Accepted/i).first(), "the history has no accepted Update").toBeVisible({ timeout: 30 * SECOND });
-    await expect(l.temporal.getByText(/Activity Task Failed/i).first(), "the history has no failed charge").toBeVisible();
-    await l.view("Code");
-
-    await l.step("Add a step while a workflow is running");
-    expect(await l.runButton("uv run hello-hold 14C 120"), "hello-hold didn't start 14C").toBe(0);
-    const heldAt = Date.now();
-    await l.openFile("hello/hold.py");
-    // "in place of the TODO(ch06) there": its snippet goes in at the cursor, on the TODO's line.
-    await l.cursorOn("# TODO(ch06): email the traveller", { select: true });
-    await l.insert();
-    await l.restartWorker();
-    expect(await l.runButton("uv run hello-hold 15A 20"), "hello-hold didn't start 15A").toBe(0);
-    await l.sawInTerminal("worker", "Emailed the traveller: seat 15A", "the new hold sent no email");
-    // 14C's two minutes, and a moment for its timer's task to fail on the new code.
-    await sleep(Math.max(0, heldAt + 2 * MINUTE + 10 * SECOND - Date.now()));
-    await l.openInTemporal("button[data-workflow-open]");
-    await expect(l.temporal.getByText(/Workflow Task Failed/i).first(), "14C didn't fail its task on the new code").toBeVisible({ timeout: 30 * SECOND });
-    await expect(l.temporal.getByText(/nondetermin/i).first(), "14C's failed task isn't a nondeterminism error").toBeVisible({ timeout: 30 * SECOND });
-    await l.view("Code");
-
-    await l.step("Patch it");
-    // "Replace your line with": the line step 6 put in.
-    await l.cursorOn("await workflow.execute_activity(send_hold_email", { select: true });
-    await l.insert();
-    await l.restartWorker();
-    // 14C is still on show in the Temporal UI: its failed task is retried, and it completes.
-    await untilStatus(l, "hold-14c-", "Completed", "14C didn't complete on the patched code");
-    await l.view("Code");
-    const emailed = await l.countInTerminal("worker", "Emailed the traveller: seat 15A");
-    expect(await l.runButton("uv run hello-hold 15A 20"), "hello-hold didn't start 15A").toBe(0);
-    await l.sawInTerminal("worker", "Emailed the traveller: seat 15A", "a new hold on the patched code sent no email", { moreThan: emailed });
-
-    await l.step("Replay it first");
-    await l.openFile("hello/replay.py");
-    await l.insert();
-    expect(await l.runButton("uv run hello-replay hold-14c"), "the replays failed").toBe(0);
-    expect(l.flatOutput, "14C didn't replay on this code").toMatch(/✓ hold-14c-\w+ replays on this code/);
-    expect(l.flatOutput, "15A didn't replay on this code").toMatch(/✓ hold-15a-\w+ replays on this code/);
-    await l.step("Catch a teammate's change");
-    // Not done here: deleting the email step by hand, and replaying again to see 15A fail.
-
-    await l.check("06-building-blocks");
-  },
+  "06-building-blocks": buildingBlocks(BLOCKS.python),
 };
 
 // A step's "Send …" button for `card`: the Temporal UI opens Send an Update on the
@@ -500,7 +545,8 @@ async function submitNewCard(l, card) {
   await l.body.locator(`button[data-workflow-update="new_card"][data-update-input*='"${card}"']`).first().click();
   await expect(l.page.getByRole("tab", { name: "Temporal UI", exact: true })).toHaveAttribute("aria-selected", "true");
   const dialog = l.temporal.getByRole("dialog");
-  await expect(dialog.locator(".cm-content"), `Send an Update wasn't filled in with card ${card}`).toContainText(card, { timeout: 30 * SECOND });
+  // The input, not the box below it that shows the last attempt's error (with a stack trace, in TypeScript and Java).
+  await expect(dialog.locator('.cm-content[contenteditable="true"]'), `Send an Update wasn't filled in with card ${card}`).toContainText(card, { timeout: 30 * SECOND });
   await dialog.getByRole("button", { name: "Submit" }).click();
 }
 

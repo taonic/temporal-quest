@@ -73,7 +73,7 @@ uv run travel-worker                 # the agent's worker: in its own terminal, 
 
 ### In TypeScript
 
-Fundamentals' first tier (Hello Temporal) also comes in TypeScript; the rest of the workshop is Python whatever you choose. You need [Node 24](https://nodejs.org), and the stack above (`uv run travel-stack up`) as for Python. Then:
+Fundamentals (Hello Temporal and Building blocks) also comes in TypeScript; the rest of the workshop is Python whatever you choose. You need [Node 24](https://nodejs.org), and the stack above (`uv run travel-stack up`) as for Python. Then:
 
 ```bash
 ./quest lang typescript              # do the modules in TypeScript (./quest lang python to switch back)
@@ -83,6 +83,32 @@ npm run start -- SFO JFK             # a trip; npm run board -- SFO JFK, a board
 ```
 
 The checks are the same Python ones, run against your TypeScript worker: `../../../quest check F2`, or `./quest check F2` from the repo root.
+
+### In Java
+
+Fundamentals comes in Java too. You need a JDK 21 (`java` on your `PATH`, or `JAVA_HOME`), and the stack above. Then:
+
+```bash
+./quest lang java                    # do the modules in Java
+cd langs/java/hello
+./hello worker                       # the worker, in its own terminal (./hello builds the code first)
+./hello start SFO JFK                # a trip; ./hello board SFO JFK, a boarding
+```
+
+The first `./hello` downloads Gradle and the SDK, a minute or two. The checks are the same Python ones, run against your Java worker: `./quest check F2` from the repo root.
+
+### In C#
+
+Fundamentals comes in C# too. You need the .NET 10 SDK (`dotnet` on your `PATH`), and the stack above. Then:
+
+```bash
+./quest lang dotnet                  # do the modules in C#
+cd langs/dotnet/hello
+./hello worker                       # the worker, in its own terminal (./hello builds the code first)
+./hello start SFO JFK                # a trip; ./hello board SFO JFK, a boarding
+```
+
+The checks are the same Python ones, run against your C# worker: `./quest check F2` from the repo root.
 
 ### Starter or solution
 

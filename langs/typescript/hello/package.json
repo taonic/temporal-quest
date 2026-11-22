@@ -6,6 +6,11 @@
     "worker": "tsx src/worker.ts",
     "start": "tsx src/starter.ts trip",
     "board": "tsx src/starter.ts board",
+    "hold": "tsx src/starter.ts hold",
+    "pay": "tsx src/starter.ts pay",
+    "itinerary": "tsx src/starter.ts itinerary",
+    "book": "tsx src/starter.ts book",
+    "replay": "tsx src/replay.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

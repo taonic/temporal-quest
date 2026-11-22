@@ -590,7 +590,8 @@ server.on("upgrade", async (req, socket, head) => {
     const ping = setInterval(() => ws.readyState === ws.OPEN && ws.ping(), 25_000);
     ws.on("close", () => clearInterval(ping));
     if (lsp) {
-      relayLsp(manager, learner, ws, url.searchParams.get("lang") === "typescript" ? "typescript" : "python").catch((err) => {
+      const language = ["typescript", "dotnet"].includes(url.searchParams.get("lang")) ? url.searchParams.get("lang") : "python";
+      relayLsp(manager, learner, ws, language).catch((err) => {
         log(`language server relay failed: ${err.message}`);
         if (ws.readyState === ws.OPEN) ws.close(4001, "unavailable");
       });

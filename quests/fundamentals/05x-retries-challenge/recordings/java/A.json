@@ -1,0 +1,62 @@
+{
+  "fingerprint": "960eee101890c3ae",
+  "choice": "A",
+  "lines": [
+    {
+      "type": "step",
+      "text": "Started a trip: SFO → JFK. The database will fail SFO's first 3 lookups.",
+      "kind": "info",
+      "t": 6.4
+    },
+    {
+      "type": "step",
+      "text": "Started the worker",
+      "kind": "worker",
+      "t": 7.4
+    },
+    {
+      "type": "step",
+      "text": "Lookup SFO, attempt 1: 503, the database is overloaded",
+      "kind": "bad",
+      "t": 7.6
+    },
+    {
+      "type": "step",
+      "text": "Lookup SFO, attempt 2: 503, the database is overloaded",
+      "kind": "bad",
+      "t": 9.6
+    },
+    {
+      "type": "step",
+      "text": "Lookup SFO, attempt 3: 503, the database is overloaded",
+      "kind": "bad",
+      "t": 13.6
+    },
+    {
+      "type": "step",
+      "text": "Stopped the worker",
+      "kind": "worker",
+      "t": 14.0
+    },
+    {
+      "type": "step",
+      "text": "The trip failed: 503: the airport database is overloaded (SFO, attempt 3)",
+      "kind": "bad",
+      "t": 14.0
+    }
+  ],
+  "done": {
+    "type": "done",
+    "choice": "A",
+    "right": false,
+    "summary": "The trip failed: the lookup ran out of attempts.",
+    "result": null,
+    "error": "503: the airport database is overloaded (SFO, attempt 3)",
+    "focus": "challenge-fc1-a-6970-trip",
+    "events": [
+      "Activity Task Failed: attempt 3 of 3",
+      "Workflow Execution Failed"
+    ],
+    "t": 14.0
+  }
+}

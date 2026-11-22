@@ -87,20 +87,26 @@ const lsp = createLsp(lspOptions);
 // TypeScript's, for an exercise in TypeScript (its sandbox has the server).
 const lspTs = createLsp({ ...lspOptions, language: "typescript" });
 const hasTs = () => files.value.some((f) => f.path.endsWith(".ts"));
+// C#'s (csharp-ls), for an exercise in C#. Java has none: its editor only highlights (ticket 02).
+const lspCs = createLsp({ ...lspOptions, language: "dotnet" });
+const hasCs = () => files.value.some((f) => f.path.endsWith(".cs"));
 function startServers() {
   lsp.start();
   if (hasTs()) lspTs.start();
+  if (hasCs()) lspCs.start();
 }
 function stopServers() {
   lsp.stop();
   lspTs.stop();
+  lspCs.stop();
 }
-// Your copy of a Python or TypeScript file, while the sandbox is live (the solution has no
+// Your copy of a Python, TypeScript or C# file, while the sandbox is live (the solution has no
 // server behind it).
 const languageServer = (path) => {
   if (!props.live || view.value !== "mine" || extra.value.some((f) => f.path === path)) return [];
   if (path.endsWith(".py")) return lsp.plugin(path);
   if (path.endsWith(".ts")) return lspTs.plugin(path);
+  if (path.endsWith(".cs")) return lspCs.plugin(path);
   return [];
 };
 

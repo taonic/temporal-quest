@@ -1,0 +1,68 @@
+{
+  "fingerprint": "71fa695e95aebac8",
+  "choice": "A",
+  "lines": [
+    {
+      "type": "step",
+      "text": "Started boarding SFO→JFK: 3 passengers, one a second.",
+      "kind": "info",
+      "t": 2.2
+    },
+    {
+      "type": "step",
+      "text": "Started the worker",
+      "kind": "worker",
+      "t": 2.9
+    },
+    {
+      "type": "step",
+      "text": "Query before the restart: boarded 1",
+      "kind": "good",
+      "t": 4.6
+    },
+    {
+      "type": "step",
+      "text": "Stopped the worker",
+      "kind": "worker",
+      "t": 5.0
+    },
+    {
+      "type": "step",
+      "text": "Started a new worker",
+      "kind": "worker",
+      "t": 5.0
+    },
+    {
+      "type": "step",
+      "text": "Query after the restart: boarded 0",
+      "kind": "bad",
+      "t": 5.7
+    },
+    {
+      "type": "step",
+      "text": "Stopped the new worker",
+      "kind": "worker",
+      "t": 9.2
+    },
+    {
+      "type": "step",
+      "text": "Flight SFO→JFK: 3 passengers boarded.",
+      "kind": "info",
+      "t": 9.2
+    }
+  ],
+  "done": {
+    "type": "done",
+    "choice": "A",
+    "right": false,
+    "summary": "The count fell from 1 to 0 after the restart.",
+    "result": "Flight SFO→JFK: 3 passengers boarded.",
+    "error": null,
+    "focus": "challenge-fc2-a-ac06-board",
+    "events": [
+      "Workflow Execution Completed",
+      "Query boarded: 1 before the restart, 0 after"
+    ],
+    "t": 9.2
+  }
+}

@@ -1,0 +1,16 @@
+<!-- A log you can read: the time, the level and one line (LogLine.java). Yours, and the workflows',
+     at INFO; the SDK's at WARN, which is where it says that a workflow task or an activity failed. -->
+<configuration>
+  <conversionRule conversionWord="say" class="hello.LogLine"/>
+  <appender name="out" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>%d{HH:mm:ss} %level %say%n%nopex</pattern>
+    </encoder>
+  </appender>
+  <logger name="hello" level="INFO"/>
+  <!-- It says "uncaught exception" again after each failed workflow task: once is enough. -->
+  <logger name="io.temporal.internal.worker.PollerOptions" level="OFF"/>
+  <root level="WARN">
+    <appender-ref ref="out"/>
+  </root>
+</configuration>

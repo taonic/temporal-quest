@@ -38,6 +38,28 @@ choices:
             retry: { initialInterval: '2 seconds', backoffCoefficient: 2, maximumAttempts: 3 },
           });
           return await lookup_airport(code);
+      java:
+        code: |
+          // Three tries is plenty: if the database is still down, fail fast.
+          Activities activities = Workflow.newActivityStub(Activities.class, ActivityOptions.newBuilder()
+                  .setStartToCloseTimeout(Duration.ofSeconds(10))
+                  .setRetryOptions(RetryOptions.newBuilder()
+                          .setInitialInterval(Duration.ofSeconds(2))
+                          .setBackoffCoefficient(2)
+                          .setMaximumAttempts(3)
+                          .build())
+                  .build());
+          return activities.lookupAirport(code);
+      dotnet:
+        code: |
+          // Three tries is plenty: if the database is still down, fail fast.
+          return await Workflow.ExecuteActivityAsync(
+              (Activities act) => act.LookupAirportAsync(code),
+              new()
+              {
+                  StartToCloseTimeout = TimeSpan.FromSeconds(10),
+                  RetryPolicy = new() { InitialInterval = TimeSpan.FromSeconds(2), BackoffCoefficient = 2, MaximumAttempts = 3 },
+              });
   - label: Try once, and fall back if it fails
     code: |
       # One try, and never fail the trip: if the lookup fails, carry on with what we know.
@@ -64,6 +86,31 @@ choices:
           } catch {
             return { code, name: 'Unknown airport', city: 'somewhere' };
           }
+      java:
+        code: |
+          // One try, and never fail the trip: if the lookup fails, carry on with what we know.
+          Activities activities = Workflow.newActivityStub(Activities.class, ActivityOptions.newBuilder()
+                  .setStartToCloseTimeout(Duration.ofSeconds(10))
+                  .setRetryOptions(RetryOptions.newBuilder().setMaximumAttempts(1).build())
+                  .build());
+          try {
+              return activities.lookupAirport(code);
+          } catch (RuntimeException failure) {
+              return new Airport(code, "Unknown airport", "somewhere");
+          }
+      dotnet:
+        code: |
+          // One try, and never fail the trip: if the lookup fails, carry on with what we know.
+          try
+          {
+              return await Workflow.ExecuteActivityAsync(
+                  (Activities act) => act.LookupAirportAsync(code),
+                  new() { StartToCloseTimeout = TimeSpan.FromSeconds(10), RetryPolicy = new() { MaximumAttempts = 1 } });
+          }
+          catch (Exception)
+          {
+              return new Airport(code, "Unknown airport", "somewhere");
+          }
   - label: Retry with a backoff, and no limit
     right: true
     code: |
@@ -86,6 +133,28 @@ choices:
             retry: { initialInterval: '2 seconds', backoffCoefficient: 2, maximumInterval: '6 seconds' },
           });
           return await lookup_airport(code);
+      java:
+        code: |
+          // Retry failures, waiting 2s, then twice as long each time, up to 6s between attempts.
+          Activities activities = Workflow.newActivityStub(Activities.class, ActivityOptions.newBuilder()
+                  .setStartToCloseTimeout(Duration.ofSeconds(10))
+                  .setRetryOptions(RetryOptions.newBuilder()
+                          .setInitialInterval(Duration.ofSeconds(2))
+                          .setBackoffCoefficient(2)
+                          .setMaximumInterval(Duration.ofSeconds(6))
+                          .build())
+                  .build());
+          return activities.lookupAirport(code);
+      dotnet:
+        code: |
+          // Retry failures, waiting 2s, then twice as long each time, up to 6s between attempts.
+          return await Workflow.ExecuteActivityAsync(
+              (Activities act) => act.LookupAirportAsync(code),
+              new()
+              {
+                  StartToCloseTimeout = TimeSpan.FromSeconds(10),
+                  RetryPolicy = new() { InitialInterval = TimeSpan.FromSeconds(2), BackoffCoefficient = 2, MaximumInterval = TimeSpan.FromSeconds(6) },
+              });
 langs:
   typescript:
     file: langs/typescript/hello/src/workflows.ts
@@ -99,6 +168,41 @@ langs:
         retry: { initialInterval: '2 seconds', backoffCoefficient: 2, maximumInterval: '6 seconds' },
       });
       return await lookup_airport(code);
+  java:
+    file: langs/java/hello/src/main/java/hello/HelloTripWorkflowImpl.java
+    replace: |
+      // Ask Temporal to run the activity. Its result is recorded in the workflow's history,
+      // so a replay reuses the result instead of running the activity again.
+      Activities activities = Workflow.newActivityStub(Activities.class, ActivityOptions.newBuilder()
+              // How long one attempt may take before Temporal times it out and tries again.
+              .setStartToCloseTimeout(Duration.ofSeconds(10))
+              // Failed attempts are retried for you: wait 2s, then twice as long each time, up to 6s.
+              .setRetryOptions(RetryOptions.newBuilder()
+                      .setInitialInterval(Duration.ofSeconds(2))
+                      .setBackoffCoefficient(2)
+                      .setMaximumInterval(Duration.ofSeconds(6))
+                      .build())
+              .build());
+      return activities.lookupAirport(code);
+  dotnet:
+    file: langs/dotnet/hello/HelloTripWorkflow.cs
+    replace: |
+      // Ask Temporal to run the activity. Its result is recorded in the workflow's history,
+      // so a replay reuses the result instead of running the activity again.
+      return await Workflow.ExecuteActivityAsync(
+          (Activities act) => act.LookupAirportAsync(code),
+          new()
+          {
+              // How long one attempt may take before Temporal times it out and tries again.
+              StartToCloseTimeout = TimeSpan.FromSeconds(10),
+              // Failed attempts are retried for you: wait 2s, then twice as long each time, up to 6s.
+              RetryPolicy = new()
+              {
+                  InitialInterval = TimeSpan.FromSeconds(2),
+                  BackoffCoefficient = 2,
+                  MaximumInterval = TimeSpan.FromSeconds(6),
+              },
+          });
 ---
 
-The airport database is having a bad minute: SFO's lookup fails three times before it gets through. Which version of `airport()` in <!-- lang python -->`hello/workflow.py`<!-- /lang --><!-- lang typescript -->`src/workflows.ts`<!-- /lang --> gets the SFO → JFK trip through, with the right airports?
+The airport database is having a bad minute: SFO's lookup fails three times before it gets through. Which version of `airport()` in <!-- lang python -->`hello/workflow.py`<!-- /lang --><!-- lang typescript -->`src/workflows.ts`<!-- /lang --><!-- lang java -->`HelloTripWorkflowImpl.java`<!-- /lang --><!-- lang dotnet -->`HelloTripWorkflow.cs`<!-- /lang --> gets the SFO → JFK trip through, with the right airports?
