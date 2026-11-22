@@ -382,6 +382,23 @@ h3 {
   color: var(--temporal-uv);
 }
 
+/* An item with an icon (the account menu): the icon, then its words. */
+.menu-item:has(> .menu-icon) {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+
+.menu-icon {
+  flex: none;
+  color: var(--muted);
+}
+
+.menu-item:hover:not(:disabled) .menu-icon {
+  color: currentColor;
+}
+
 .menu-item:disabled {
   opacity: 0.45;
   cursor: not-allowed;

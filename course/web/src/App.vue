@@ -8,6 +8,7 @@ import EarnMoment from "./components/EarnMoment.vue";
 import FeedbackForm from "./components/FeedbackForm.vue";
 import ModuleNav from "./components/ModuleNav.vue";
 import LanguageChoice from "./components/LanguageChoice.vue";
+import MenuIcon from "./components/MenuIcon.vue";
 import PersonaChoice from "./components/PersonaChoice.vue";
 import { languageLabel } from "./language.js";
 import WelcomeIntro from "./components/WelcomeIntro.vue";
@@ -324,14 +325,14 @@ watch(() => store.user, (user) => !user && closeFeedback());
           <div v-if="accountOpen" class="menu" role="menu" @keydown.escape="accountOpen = false">
             <p v-if="store.race" class="menu-note">Racing as <strong>{{ store.race.name }}</strong> on <strong>{{ store.race.horse }}</strong> in {{ store.race.raceName }}. Your pit-pass: <strong>{{ store.race.pitPass }}</strong></p>
             <p v-else class="menu-note">Signed in as <strong>{{ store.user.email }}</strong>{{ store.user.cohort ? ` · ${store.user.cohort.name}` : "" }}</p>
-            <a v-if="store.race" class="menu-item" role="menuitem" :href="`/race/${store.race.slug}`" target="_blank" rel="noopener" @click="accountOpen = false">Watch the race 🏇</a>
-            <button v-if="exercise" class="menu-item" type="button" role="menuitem" @click="startTour(); accountOpen = false">Take the tour</button>
-            <button v-if="!store.race" class="menu-item" type="button" role="menuitem" @click="store.personaPicker = true; accountOpen = false">Learning as: <strong>{{ personaLabel }}</strong> · switch</button>
-            <button v-if="!store.race && languageChoice" class="menu-item" type="button" role="menuitem" @click="store.languagePicker = true; accountOpen = false">Building in: <strong>{{ languageLabel(course, store.language.id) }}</strong> · switch</button>
-            <button class="menu-item" type="button" role="menuitem" @click="openFeedback(); accountOpen = false">Send feedback</button>
-            <button class="menu-item" type="button" role="menuitem" @click="store.theme = store.theme === 'dark' ? 'light' : 'dark'; accountOpen = false">{{ store.theme === "dark" ? "Light mode" : "Dark mode" }}</button>
-            <a v-if="store.user.admin" class="menu-item" role="menuitem" href="#/admin" @click="accountOpen = false">Admin panel</a>
-            <button class="menu-item" type="button" role="menuitem" @click="signOut(); accountOpen = false">Sign out</button>
+            <a v-if="store.race" class="menu-item" role="menuitem" :href="`/race/${store.race.slug}`" target="_blank" rel="noopener" @click="accountOpen = false"><MenuIcon name="race" />Watch the race</a>
+            <button v-if="exercise" class="menu-item" type="button" role="menuitem" @click="startTour(); accountOpen = false"><MenuIcon name="tour" />Take the tour</button>
+            <button v-if="!store.race" class="menu-item" type="button" role="menuitem" @click="store.personaPicker = true; accountOpen = false"><MenuIcon name="persona" /><span>Learning as: <strong>{{ personaLabel }}</strong> · switch</span></button>
+            <button v-if="!store.race && languageChoice" class="menu-item" type="button" role="menuitem" @click="store.languagePicker = true; accountOpen = false"><MenuIcon name="language" /><span>Building in: <strong>{{ languageLabel(course, store.language.id) }}</strong> · switch</span></button>
+            <button class="menu-item" type="button" role="menuitem" @click="openFeedback(); accountOpen = false"><MenuIcon name="feedback" />Send feedback</button>
+            <button class="menu-item" type="button" role="menuitem" @click="store.theme = store.theme === 'dark' ? 'light' : 'dark'; accountOpen = false"><MenuIcon :name="store.theme === 'dark' ? 'sun' : 'moon'" />{{ store.theme === "dark" ? "Light mode" : "Dark mode" }}</button>
+            <a v-if="store.user.admin" class="menu-item" role="menuitem" href="#/admin" @click="accountOpen = false"><MenuIcon name="admin" />Admin panel</a>
+            <button class="menu-item" type="button" role="menuitem" @click="signOut(); accountOpen = false"><MenuIcon name="signout" />Sign out</button>
           </div>
         </div>
         <button v-if="!store.user" class="button button-secondary theme-toggle" type="button" :aria-pressed="store.theme === 'dark'" :title="store.theme === 'dark' ? 'Light mode' : 'Dark mode'" @click="store.theme = store.theme === 'dark' ? 'light' : 'dark'">
