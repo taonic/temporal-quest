@@ -247,7 +247,8 @@ function caughtUp(ids, worker) {
   const names = titles.length > 1 ? `${titles.slice(0, -1).join(", ")} and ${titles.at(-1)}` : titles[0];
   const restart = worker?.running && !store.worker.pending;
   toast(`Solved in your sandbox, so this one doesn't depend on ${titles.length > 1 ? "them" : "it"}: ${names}${restart ? ". Restarting the worker" : ""}`, 5200);
-  if (restart) runInTerminal("worker", [worker.name === "hello-worker" ? "uv run hello-worker" : "uv run travel-worker"], { interrupt: true, reveal: false });
+  // The exercise's worker, in the learner's language: the one that was running.
+  if (restart) runInTerminal("worker", [exercise.value.worker], { interrupt: true, reveal: false });
 }
 
 function restartStaleWorker() {

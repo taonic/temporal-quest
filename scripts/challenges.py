@@ -130,7 +130,7 @@ def challenges() -> dict[str, Challenge]:
             )
             if sum(c.right for c in choices) != 1:
                 raise ValueError(f"{path}: exactly one choice is right, not {sum(c.right for c in choices)}")
-            languages = tuple(branches()[branch]["languages"])
+            languages = tuple(m.get("languages") or branches()[branch]["languages"])
             langs = m.get("langs") or {}
             for language in languages[1:]:
                 for key in ("file", "replace"):

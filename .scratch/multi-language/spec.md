@@ -26,7 +26,7 @@ Today every Developer module is Python: the code learners edit (`hello/`, `trave
 - **Fundamentals only** for now (above).
 - **TypeScript first, then Java, then .NET.** TypeScript has the lightest toolchain, the cheapest language server and the largest audience after Python.
 - **Toolchains:** Node 24, JDK 21 with Gradle, and .NET 10, each the current LTS. If ticket 02 shows the Gradle daemon doesn't fit, Java moves to Maven. Each language pins its SDK in its lockfile.
-- **A language ships one tier at a time.** Once TypeScript has tier 1 (F1–F7, FC1, FC2), Fundamentals offers it for tier 1. A TypeScript learner who reaches F8 gets it in Python, tagged "Python". That works because every language's sandbox has the Python base.
+- **A language ships one tier at a time.** Once TypeScript has tier 1 (F1–F7, FC1, FC2), Fundamentals offers it for tier 1. A module or challenge not yet written in a language narrows its branch's list (`languages: [python]`), and the site offers a language once it has a whole tier (ticket 05). A TypeScript learner who reaches F8 gets it in Python, tagged "Python". That works because every language's sandbox has the Python base.
 - **No reviewer gate.** A tier ships in a language when `verify_modules.py` and the e2e pass in it.
 
 ### Content ([ADR 0001](../../docs/adr/0001-one-module-several-languages.md))

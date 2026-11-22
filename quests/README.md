@@ -191,6 +191,8 @@ return await lookup_airport(code);
 
 Code blocks are named `python`, `typescript`, `java` and `csharp` (for `dotnet`).
 
+**A language ships a tier at a time.** A module (or challenge) not written in all of its branch's languages yet says which it has: `languages: [python]`, some of its branch's, from the first. A learner on another language does it in the branch's first, and the site says so ("in Python"). The site asks learners which language they build in only once a language has a whole tier: every ready module and challenge in one of a branch's tiers (`course.languages`).
+
 **Its frontmatter** is its default language's. `langs:` gives what differs in each other language: `files`, `tour`, `tourAfter`, `questions`, `hint` (its check's), `worker`. A module with files, a tour or a code check must give its own in every other language:
 
 ```yaml

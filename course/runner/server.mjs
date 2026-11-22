@@ -380,14 +380,14 @@ const routes = {
 
   "GET /api/progress": async (req) => {
     const session = requireUser(req);
-    return activity.progress(session.id, session.access.cohort?.path);
+    return activity.progress(session.id, session.access.cohort?.path, session.access.cohort?.language);
   },
 
   // The progress this browser had before the first sign-in: kept, once per user.
   "POST /api/progress/import": async (req) => {
     const session = requireUser(req);
     activity.importProgress(session.id, await readJson(req));
-    return activity.progress(session.id, session.access.cohort?.path);
+    return activity.progress(session.id, session.access.cohort?.path, session.access.cohort?.language);
   },
 
   "POST /api/events": async (req) => {

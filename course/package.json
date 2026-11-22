@@ -16,6 +16,9 @@
     "deploy": "cd .. && fly deploy . --config course/fly.toml --dockerfile course/Dockerfile --ignorefile course/.dockerignore --ha=false"
   },
   "dependencies": {
+    "@codemirror/lang-java": "^6.0.2",
+    "@codemirror/lang-javascript": "^6.2.5",
+    "@codemirror/legacy-modes": "^6.5.5",
     "@daytonaio/sdk": "^0.224.1",
     "ws": "^8.22.0"
   },

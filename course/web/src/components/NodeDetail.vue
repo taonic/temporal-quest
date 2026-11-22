@@ -6,6 +6,8 @@
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 
 import ConceptChips from "./ConceptChips.vue";
+import { languageLabel, moduleLanguage } from "../language.js";
+import { course, store } from "../store.js";
 import NodeGlyph from "./NodeGlyph.vue";
 import {
   STATE_LABEL,
@@ -45,11 +47,17 @@ const where = computed(() => {
   return `Tier ${roman(mod.tier)} · ${branch.value.tiers[mod.tier - 1]?.name ?? ""}`;
 });
 
+// A module that doesn't come in the learner's language yet is done in its first: say which.
+const otherLanguage = computed(() => {
+  const lang = moduleLanguage(m.value, store.language.id);
+  return lang === store.language.id ? "" : ` · in ${languageLabel(course, lang)}`;
+});
+
 const howLong = computed(() => {
   const mod = m.value;
   if (mod.kind === "boss") return `About ${mod.minutes} min, a quiz`;
-  if (mod.kind === "challenge") return `About ${mod.minutes} min, ${mod.choices} choices to run`;
-  return `About ${mod.minutes} min`;
+  if (mod.kind === "challenge") return `About ${mod.minutes} min, ${mod.choices} choices to run${otherLanguage.value}`;
+  return `About ${mod.minutes} min${otherLanguage.value}`;
 });
 const xpText = computed(() => (m.value.kind === "challenge" ? `up to ${m.value.xp} XP` : `+${m.value.xp} XP`));
 

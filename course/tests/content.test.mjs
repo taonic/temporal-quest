@@ -362,7 +362,7 @@ test("each persona sees its own branches, paths and badges, and what it sees bui
   assert.deepEqual(course.paths.find((p) => p.id === "agent-governance-4h").personas, ["developer"]);
   const skills = (persona) => course.badges.filter((b) => b.kind === "skill" && b.personas.includes(persona)).map((b) => b.id);
   assert.deepEqual(skills("essentials"), ["clean-run", "flawless", "logbook-keeper", "fix-forward", "storm-rider", "night-owl", "crash-proof", "time-keeper", "signed-off", "clean-undo"]);
-  assert.deepEqual(skills("developer"), ["clean-run", "no-peeking", "flawless", "explorer", "cross-team", "first-run", "history-reader", "retry-wrangler", "count-keeper", "seat-holder", "trip-planner", "second-chance", "safe-shipper", "session-starter", "tool-fixer", "code-mode", "approver", "light-touch", "patient-gate", "time-traveler", "good-neighbor", "steady-partner"]);
+  assert.deepEqual(skills("developer"), ["clean-run", "no-peeking", "flawless", "explorer", "polyglot", "cross-team", "first-run", "history-reader", "retry-wrangler", "count-keeper", "seat-holder", "trip-planner", "second-chance", "safe-shipper", "session-starter", "tool-fixer", "code-mode", "approver", "light-touch", "patient-gate", "time-traveler", "good-neighbor", "steady-partner"]);
   const essentials = course.exercises.find((e) => e.id === "07-essentials");
   assert.equal(essentials.layout, "board");
   assert.deepEqual(essentials.personas, ["essentials"]);

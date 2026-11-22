@@ -42,6 +42,10 @@ watch(showInternal, (on) => {
   }
 });
 const personaName = (id) => course.personas?.find((p) => p.id === id)?.label ?? id ?? "—";
+// A language as learners see it called (course.languages); none chosen is Python.
+const languageName = (id) => course.languages?.find((l) => l.id === id)?.label ?? id ?? "Python";
+// Whether there's a language to choose: until then, nothing here says which.
+const languagesOffered = computed(() => (course.languages?.length ?? 1) > 1);
 const error = ref("");
 
 // --- Formatting -------------------------------------------------------------------------------
@@ -80,6 +84,7 @@ const EVENT_LABELS = {
   boss_result: "fought",
   path_set: "chose a path",
   persona_set: "chose who they learn as",
+  language_set: "chose the language they build in",
   solution_used: "used the solution in",
   badge_earned: "earned a badge:",
   helper_question: "asked Temporal a question",
@@ -115,6 +120,7 @@ function eventText(e) {
   if (e.type === "model_calls") return `${label} (${d.count})`;
   if (e.type === "path_set") return `${label}: ${d.path ?? "none"}`;
   if (e.type === "persona_set") return `${label}: ${personaName(d.persona)}`;
+  if (e.type === "language_set") return `${label}: ${languageName(d.language)}`;
   if (e.type === "allowlist_added") return `${label} ${(d.entries ?? []).join(", ")} to ${d.cohort}`;
   if (e.type === "allowlist_removed") return `${label} ${d.entry}`;
   if (["cohort_created", "cohort_saved"].includes(e.type)) return `${label}: ${d.cohort}`;
@@ -247,19 +253,19 @@ function deleteLearner() {
 
 const editing = ref(false); // a form is being typed in: don't refresh under it
 const selectedCohort = computed(() => overview.value.cohorts.find((c) => c.id === cohortId.value) ?? null);
-const form = ref({ id: null, name: "", path: "", endsAt: "", allowanceHours: 8 });
+const form = ref({ id: null, name: "", path: "", language: "", endsAt: "", allowanceHours: 8 });
 watch(
   selectedCohort,
   (c) => {
     if (!c || editing.value) return;
-    form.value = { id: c.id, name: c.name, path: c.path ?? "", endsAt: dateInput(c.endsAt), allowanceHours: c.allowanceMinutes / 60 };
+    form.value = { id: c.id, name: c.name, path: c.path ?? "", language: c.language ?? "", endsAt: dateInput(c.endsAt), allowanceHours: c.allowanceMinutes / 60 };
   },
   { immediate: true },
 );
 function newCohort() {
   cohortId.value = null;
   entries.value = [];
-  form.value = { id: null, name: "", path: "", endsAt: "", allowanceHours: 8 };
+  form.value = { id: null, name: "", path: "", language: "", endsAt: "", allowanceHours: 8 };
   editing.value = true;
 }
 function saveCohort() {
@@ -267,7 +273,7 @@ function saveCohort() {
   // An end date ends the cohort at the end of that day, local time.
   const endsAt = f.endsAt ? new Date(`${f.endsAt}T23:59:59`).getTime() : null;
   act(async () => {
-    const { cohort } = await api("/api/admin/cohorts", { method: "POST", body: { id: f.id, name: f.name, path: f.path || null, endsAt, allowanceMinutes: Math.round(Number(f.allowanceHours) * 60) } });
+    const { cohort } = await api("/api/admin/cohorts", { method: "POST", body: { id: f.id, name: f.name, path: f.path || null, language: f.language || null, endsAt, allowanceMinutes: Math.round(Number(f.allowanceHours) * 60) } });
     editing.value = false;
     cohortId.value = cohort.id;
   }, "Cohort saved");
@@ -369,6 +375,10 @@ const cohortName = (id) => overview.value.cohorts.find((c) => c.id === id)?.name
             <span>Learning as</span><strong>{{ personaName(journey.persona) }}</strong>
             <em v-if="journey.personaChanges.length">{{ journey.personaChanges.length > 1 ? `switched ${journey.personaChanges.length - 1}×, last ` : "chose it " }}{{ when(journey.personaChanges.at(-1).at) }}</em>
           </div>
+          <div v-if="languagesOffered">
+            <span>Building in</span><strong>{{ languageName(journey.language) }}</strong>
+            <em v-if="journey.languageChanges?.length">{{ journey.languageChanges.length > 1 ? `switched ${journey.languageChanges.length - 1}×, last ` : "chose it " }}{{ when(journey.languageChanges.at(-1).at) }}</em>
+          </div>
           <div><span>XP</span><strong>{{ journey.xp }}</strong></div>
           <div><span>Modules passed</span><strong>{{ journey.passed.length }}</strong></div>
           <div :class="{ 'is-stuck': journey.where?.stuck }">
@@ -385,10 +395,11 @@ const cohortName = (id) => overview.value.cohorts.find((c) => c.id === id)?.name
           <div class="admin-card">
             <h3>Modules passed</h3>
             <table v-if="journey.passed.length" class="admin-table">
-              <thead><tr><th>Module</th><th>Time on it</th><th>Failed checks</th><th>Passed</th></tr></thead>
+              <thead><tr><th>Module</th><th>Time on it</th><th>Failed checks</th><th>Passed</th><th v-if="languagesOffered">In</th></tr></thead>
               <tbody>
                 <tr v-for="m in journey.passed" :key="m.id">
                   <td>{{ moduleLabel(m.id) }}</td><td>{{ duration(m.seconds) }}</td><td>{{ m.failedChecks || "" }}</td><td>{{ when(m.at) }}</td>
+                  <td v-if="languagesOffered">{{ (m.languages ?? []).map(languageName).join(", ") }}</td>
                 </tr>
               </tbody>
             </table>
@@ -456,7 +467,7 @@ const cohortName = (id) => overview.value.cohorts.find((c) => c.id === id)?.name
       <div class="admin-card table-scroll">
         <table class="admin-table admin-learners">
           <thead>
-            <tr><th>Learner</th><th>Role</th><th>Cohort</th><th>Learning as</th><th>Now</th><th>Passed</th><th>XP</th><th>Sandbox (24 h)</th><th>Last active</th></tr>
+            <tr><th>Learner</th><th>Role</th><th>Cohort</th><th>Learning as</th><th v-if="languagesOffered">Language</th><th>Now</th><th>Passed</th><th>XP</th><th>Sandbox (24 h)</th><th>Last active</th></tr>
           </thead>
           <tbody>
             <tr v-for="l in sortedLearners" :key="l.id" :class="{ 'is-stuck': l.where?.stuck, 'is-blocked': l.status === 'blocked' }" tabindex="0" @click="openLearner(l.id)" @keydown.enter="openLearner(l.id)">
@@ -469,6 +480,7 @@ const cohortName = (id) => overview.value.cohorts.find((c) => c.id === id)?.name
               <td>{{ l.role }}<br><span class="admin-muted">{{ l.company }}</span></td>
               <td>{{ l.cohort?.name ?? "" }}</td>
               <td>{{ personaName(l.persona) }}</td>
+              <td v-if="languagesOffered">{{ languageName(l.language) }}</td>
               <td>
                 <template v-if="l.where?.active">{{ moduleLabel(l.where.moduleId) }}<br><span class="admin-muted">{{ l.where.minutes }} min{{ l.where.stuck ? " · stuck" : "" }}</span></template>
                 <span v-else class="admin-muted">—</span>
@@ -537,6 +549,13 @@ const cohortName = (id) => overview.value.cohorts.find((c) => c.id === id)?.name
             <select v-model="form.path">
               <option value="">None (the learner picks)</option>
               <option v-for="p in overview.paths" :key="p.id" :value="p.id">{{ p.title }}</option>
+            </select>
+          </label>
+          <label v-if="languagesOffered">
+            Language
+            <select v-model="form.language">
+              <option value="">None (Python, unless the learner picks)</option>
+              <option v-for="l in course.languages" :key="l.id" :value="l.id">{{ l.label }}</option>
             </select>
           </label>
           <label>Ends (after this day, nobody in it can sign in) <input v-model="form.endsAt" type="date" :disabled="selectedCohort?.builtin"></label>

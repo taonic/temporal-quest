@@ -163,6 +163,8 @@ export function applyMode(markdown, mode) {
 // what else differs (files, tour, hint…). [ADR 0001](../../docs/adr/0001-one-module-several-languages.md)
 
 export const LANGUAGES = ["python", "typescript", "java", "dotnet"];
+// What learners see each one called.
+export const LANGUAGE_LABELS = { python: "Python", typescript: "TypeScript", java: "Java", dotnet: "C# (.NET)" };
 // A code block's language → the course's language. Any other block (bash, text…) is no language's.
 const FENCE_LANGUAGE = { python: "python", py: "python", typescript: "typescript", ts: "typescript", java: "java", csharp: "dotnet", cs: "dotnet" };
 // What a module's `langs.<language>` can give, in place of its own.
@@ -254,6 +256,34 @@ export function checkBranchLanguages(source, branch) {
   }
 }
 
+// A module's (or challenge's) own `languages:`, when it has one: some of its branch's, from the
+// first, for a module not written in all of them yet (a language ships a tier at a time). The
+// learner then does it in the branch's first language.
+export function narrowLanguages(source, own, branchLanguages) {
+  if (own == null) return branchLanguages;
+  if (!Array.isArray(own) || !own.length) throw new Error(`${source}: languages should be a list, such as [python]`);
+  if (own[0] !== branchLanguages[0]) throw new Error(`${source}: its languages start with ${own[0]}, but its branch's first is ${branchLanguages[0]}`);
+  for (const l of own) if (!branchLanguages.includes(l)) throw new Error(`${source}: language ${l} isn't one of its branch's (${branchLanguages.join(", ")})`);
+  return own;
+}
+
+// The languages the course offers learners: Python, and each other one that has at least one
+// whole tier of a branch (every ready module and challenge in it): the site asks which a learner
+// builds in only once there's a choice.
+export function offeredLanguages(branches, modules) {
+  const offered = new Set(["python"]);
+  for (const branch of branches) {
+    const tiers = new Map();
+    for (const id of branch.modules) {
+      const m = modules.get(id);
+      if (m.status !== "ready" || !["module", "challenge"].includes(m.kind)) continue;
+      tiers.set(m.tier, [...(tiers.get(m.tier) ?? []), m]);
+    }
+    for (const mods of tiers.values()) for (const l of LANGUAGES) if (mods.every((m) => m.languages.includes(l))) offered.add(l);
+  }
+  return LANGUAGES.filter((l) => offered.has(l)).map((id) => ({ id, label: LANGUAGE_LABELS[id] }));
+}
+
 // A module's `langs:`, checked against its branch's languages: what a language gives in place of
 // the module's own, and what it has to (its own files, tour and hint, when the module has them).
 export function checkModuleLanguages(source, module, languages) {
@@ -273,8 +303,8 @@ export function checkModuleLanguages(source, module, languages) {
 // place of its own. Its branch's first language is the module as written.
 function moduleIn(module, lang, branch) {
   if (module.kind !== "module") return module;
-  const body = applyLanguage(module.body, lang, branch.languages);
-  if (lang === branch.languages[0]) return body === module.body ? module : { ...module, body };
+  const body = applyLanguage(module.body, lang, module.languages);
+  if (lang === module.languages[0]) return body === module.body ? module : { ...module, body };
   const given = module.langs?.[lang] ?? {};
   return {
     ...module,
@@ -969,10 +999,12 @@ export function loadQuests() {
       }
       if (modules.has(m.id)) throw new Error(`${source}: module id ${m.id} is also ${modules.get(m.id).source}'s`);
       checkModuleCheck(source, m.check, branch.layout);
-      checkModuleLanguages(source, m, branch.languages);
-      checkLanguageText(source, text, branch.languages);
+      const languages = narrowLanguages(source, m.languages, branch.languages);
+      checkModuleLanguages(source, m, languages);
+      checkLanguageText(source, text, languages);
       modules.set(m.id, {
         ...m,
+        languages,
         branch: dir,
         source,
         status: m.status ?? "ready",
@@ -1197,6 +1229,7 @@ function loadChallenge(dir, branch, languages = ["python"]) {
   const source = `${dir}/challenge.md`;
   if (!fs.existsSync(path.join(repoRoot, source))) return null;
   const { meta, body } = parseFrontmatter(read(source));
+  languages = narrowLanguages(source, meta.languages, languages);
   const question = meta.file == null && meta.replace == null;
   for (const key of ["id", "title", "teaser", "learn", "after", "hint", "choices", ...(question ? [] : ["file", "replace"])]) {
     if (meta[key] == null) throw new Error(`${source}: no ${key} in its frontmatter`);
@@ -1342,7 +1375,7 @@ function buildExercise(md, quests, ex, number, lang) {
   const texts = mods.map((m) => {
     const challenge = challenges.find((c) => c.after === m.id);
     if (!challenge) return m.body.trim();
-    const text = applyLanguage(challenge.body, lang, branchOf(challenge).languages);
+    const text = applyLanguage(challenge.body, lang, challenge.languages);
     const section = `## Challenge: ${challenge.title}\n\n${text.trim()}`;
     beats.set(challenge.id, [slugify(`Challenge: ${challenge.title}`)]);
     // Before the module's check, or (a world check on a beat of its own: E8's, before the
@@ -1412,6 +1445,8 @@ function buildExercise(md, quests, ex, number, lang) {
     // Each module's beats in the guide, so a link to a module opens the guide at it.
     moduleBeats: Object.fromEntries(beats),
     worker: mods[0].worker,
+    // The command that starts a trip (a trip button), in this language: its branch's.
+    starter: (lang === branchOf(mods[0]).languages[0] ? branchOf(mods[0]).starter : branchOf(mods[0]).langs?.[lang]?.starter) ?? null,
     agentUi: mods[0].agentUi,
     layout,
     personas: quests.paths.find((p) => p.exercises?.includes(ex)).personas,
@@ -1467,10 +1502,9 @@ function buildExercise(md, quests, ex, number, lang) {
 // The languages an exercise comes in: those all of its modules' branches have, in its first
 // module's branch's order.
 function exerciseLanguages(quests, ex) {
-  const branchOf = (id) => quests.branches.find((b) => b.id === quests.modules.get(id).branch);
-  const [first, ...rest] = ex.modules.map(branchOf);
-  const languages = first.languages.filter((l) => rest.every((b) => b.languages.includes(l)));
-  if (!languages.length) throw new Error(`exercise ${ex.id}: its modules' branches have no language in common`);
+  const [first, ...rest] = withChallenges(ex.modules, quests.modules).map((id) => quests.modules.get(id).languages ?? ["python"]);
+  const languages = first.filter((l) => rest.every((ls) => ls.includes(l)));
+  if (!languages.length) throw new Error(`exercise ${ex.id}: its modules have no language in common`);
   return languages;
 }
 
@@ -1482,8 +1516,8 @@ function exerciseData(md, quests, ex, number) {
   if (languages.length === 1) return { ...base, languages };
   const byLang = Object.fromEntries(
     languages.slice(1).map((lang) => {
-      const { worker, files, tour, tourAfter, questions, modes, challenges } = buildExercise(md, quests, ex, number, lang);
-      return [lang, { worker, files, tour, tourAfter, questions, modes, challenges }];
+      const { worker, starter, files, tour, tourAfter, questions, modes, challenges } = buildExercise(md, quests, ex, number, lang);
+      return [lang, { worker, starter, files, tour, tourAfter, questions, modes, challenges }];
     }),
   );
   return { ...base, languages, byLang };
@@ -1638,6 +1672,8 @@ function assembleCourse() {
     setup: { html: readme.setup },
     exercises: exercises.map((ex, i) => exerciseData(md, quests, ex, i + 1)),
     branches: quests.branches.map(({ modules, ...branch }) => ({ ...branch, modules })),
+    // The languages a learner can build in (only Python: the site doesn't ask).
+    languages: offeredLanguages(quests.branches, quests.modules),
     modules: [...quests.modules.values()].map((m) => ({
       id: m.id,
       kind: m.kind,
@@ -1652,6 +1688,7 @@ function assembleCourse() {
       status: m.status,
       check: m.check.kind,
       exercise: moduleExercise.get(m.source) ?? null,
+      ...(m.languages ? { languages: m.languages } : {}),
       ...(m.concepts ? { concepts: m.concepts } : {}),
       ...(m.emoji ? { emoji: m.emoji } : {}),
       ...(m.note ? { note: m.note } : {}),
@@ -1673,7 +1710,13 @@ export function buildAssignments() {
   const quests = loadQuests();
   const out = {};
   for (const ex of quests.paths.flatMap((p) => p.exercises ?? [])) {
-    out[ex.id] = { title: ex.title, text: ex.modules.map((id) => quests.modules.get(id).body.trim()).join("\n\n") };
+    const [first, ...others] = exerciseLanguages(quests, ex);
+    const textIn = (lang) =>
+      ex.modules
+        .map((id) => quests.modules.get(id))
+        .map((m) => applyLanguage(m.body, lang, m.languages).trim())
+        .join("\n\n");
+    out[ex.id] = { title: ex.title, text: textIn(first), ...(others.length ? { byLang: Object.fromEntries(others.map((l) => [l, textIn(l)])) } : {}) };
   }
   return out;
 }

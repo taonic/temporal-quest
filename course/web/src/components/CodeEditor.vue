@@ -11,7 +11,10 @@
 // docs and signatures, F12 to go to a definition, completion as you type.
 import { basicSetup } from "codemirror";
 import { indentWithTab, redo, redoDepth, undo, undoDepth } from "@codemirror/commands";
+import { java } from "@codemirror/lang-java";
+import { javascript } from "@codemirror/lang-javascript";
 import { python } from "@codemirror/lang-python";
+import { csharp } from "@codemirror/legacy-modes/mode/clike";
 import { indentUnit, StreamLanguage } from "@codemirror/language";
 import { Annotation, Compartment, EditorState, StateEffect, StateField } from "@codemirror/state";
 import { oneDark } from "@codemirror/theme-one-dark";
@@ -166,9 +169,14 @@ const dogwood = StreamLanguage.define({
   },
 });
 
+const csharpLanguage = StreamLanguage.define(csharp);
+
 function language(path) {
   if (path.endsWith(".py")) return python();
   if (path.endsWith(".dw")) return dogwood;
+  if (path.endsWith(".ts")) return javascript({ typescript: true });
+  if (path.endsWith(".java")) return java();
+  if (path.endsWith(".cs")) return csharpLanguage;
   return [];
 }
 
@@ -255,7 +263,8 @@ function makeState(text) {
       ]),
       language(active.value),
       languageServer(active.value),
-      indentUnit.of("    "),
+      // TypeScript is written with two spaces; Python, Java and C# with four.
+      indentUnit.of(active.value.endsWith(".ts") ? "  " : "    "),
       oneDark,
       theme,
       editable.of([EditorState.readOnly.of(!canEdit.value), EditorView.editable.of(canEdit.value)]),

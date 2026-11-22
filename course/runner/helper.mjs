@@ -65,13 +65,15 @@ function readAssignments() {
 }
 
 // The assignment as the learner sees it in this mode (the course's mode blocks, as in
-// content/build.mjs: browser-only text sits in a comment, local-only text between markers).
-export function readAssignment(exerciseId, mode = "browser") {
+// content/build.mjs: browser-only text sits in a comment, local-only text between markers), in
+// their language, if it comes in it.
+export function readAssignment(exerciseId, mode = "browser", language = null) {
   if (!/^\d{2}-[a-z0-9-]+$/.test(String(exerciseId ?? ""))) return null;
   const all = readAssignments();
   const found = Object.hasOwn(all, exerciseId) ? all[exerciseId] : null;
   if (!found) return null;
-  const text = found.text
+  const inLanguage = (language && found.byLang && Object.hasOwn(found.byLang, language) && found.byLang[language]) || found.text;
+  const text = inLanguage
     .replace(/<!--\s*browser\s*\n([\s\S]*?)-->/g, (_, body) => (mode === "browser" ? body : ""))
     .replace(/<!--\s*local\s*-->([\s\S]*?)<!--\s*\/local\s*-->/g, (_, body) => (mode === "local" ? body : ""));
   return { title: found.title, text: text.trim().slice(0, LIMITS.assignment) };
@@ -99,14 +101,23 @@ function essentialsPrompt({ assignment }) {
   return parts.join("\n\n");
 }
 
-export function systemPrompt({ assignment, mode, persona = "developer" }) {
+// The language a learner builds in, as Ask Temporal names it, and the SDK it means.
+const LANGUAGE_SDKS = {
+  python: "Python (the temporalio SDK)",
+  typescript: "TypeScript (the @temporalio/* SDK)",
+  java: "Java (the io.temporal SDK)",
+  dotnet: "C# (the Temporalio .NET SDK)",
+};
+export const languageOf = (value) => (Object.hasOwn(LANGUAGE_SDKS, value) ? value : "python");
+
+export function systemPrompt({ assignment, mode, persona = "developer", language = "python" }) {
   if (personaOf(persona) === "essentials") return essentialsPrompt({ assignment });
   const parts = [
     `You are "Ask Temporal", the teaching assistant in a hands-on workshop for AI engineers who are new to Temporal. Learners ask you questions while they do the exercises. Today's date is ${new Date().toISOString().slice(0, 10)}.`,
     `How to answer:
 - For anything about Temporal (concepts, SDK APIs, the CLI, the Web UI, Temporal Cloud, error messages), call search_temporal_docs first and base your answer on what it returns. Cite the sources you used inline as [1], [2] by their numbers. Never make up a URL or an API.
 - One search is usually enough. Search again only if the first one missed; write short, specific queries ("activity retry policy python", not the learner's whole message).
-- The workshop is in Python (the temporalio SDK). Write examples in Python unless the learner asks for another language.
+- The learner is doing the workshop in ${LANGUAGE_SDKS[languageOf(language)]}. Write examples in that language unless they ask for another one. Parts of the workshop (the AI agent, Nexus) are in Python whatever their language.
 - Monty (the sandbox the agent's scripts run in), Dogwood (the policy language and verifier) and the Temporal Agent Harness are part of this workshop, not of Temporal, and the Temporal docs don't cover them. Answer questions about them from the workshop material below, and don't search for them.
 - Be a great TA: lead with the answer, then the why. Keep it short (usually under 200 words), concrete, and friendly. Use Markdown: short paragraphs, bullets, and fenced code blocks with a language.
 - Don't paste the full solution to the exercise's TODO unprompted. Explain the idea and point to the API first; if the learner asks outright for the code, give it.
@@ -475,8 +486,9 @@ export function createHelper(config, { learnerOf, siteOrigin, secure, unavailabl
 
     const mode = context.mode === "local" ? "local" : "browser";
     const persona = personaOf(context.persona);
-    const assignment = context.exercise ? readAssignment(context.exercise, mode) : null;
-    const messages = [{ role: "system", content: systemPrompt({ assignment, mode, persona }) }, ...turns];
+    const language = languageOf(context.language);
+    const assignment = context.exercise ? readAssignment(context.exercise, mode, language) : null;
+    const messages = [{ role: "system", content: systemPrompt({ assignment, mode, persona, language }) }, ...turns];
 
     const controller = new AbortController();
     const deadline = setTimeout(() => controller.abort(), 120_000);

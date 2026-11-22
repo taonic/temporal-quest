@@ -7,7 +7,9 @@ import AskSelection from "./components/AskSelection.vue";
 import EarnMoment from "./components/EarnMoment.vue";
 import FeedbackForm from "./components/FeedbackForm.vue";
 import ModuleNav from "./components/ModuleNav.vue";
+import LanguageChoice from "./components/LanguageChoice.vue";
 import PersonaChoice from "./components/PersonaChoice.vue";
+import { languageLabel } from "./language.js";
 import WelcomeIntro from "./components/WelcomeIntro.vue";
 import XpPill from "./components/XpPill.vue";
 import { closeFeedback, feedback, openFeedback } from "./feedback.js";
@@ -65,6 +67,11 @@ function revealPage() {
 const askPersona = new URLSearchParams(window.location.search).has("persona-choice") || !navigator.webdriver;
 const personaFirst = computed(() => askPersona && !store.persona.chosen && !introOpen.value && store.route.page === "home");
 const personaLabel = computed(() => course.personas.find((p) => p.id === store.persona.id)?.label ?? "");
+// The language a developer builds in: asked right after the persona, once there's more than Python.
+const languageChoice = computed(() => (course.languages?.length ?? 1) > 1 && store.persona.id === "developer");
+const languageFirst = computed(
+  () => languageChoice.value && store.persona.chosen && !store.language.chosen && !personaFirst.value && !introOpen.value && store.route.page === "home",
+);
 
 const menuOpen = ref(false);
 const accountOpen = ref(false);
@@ -320,6 +327,7 @@ watch(() => store.user, (user) => !user && closeFeedback());
             <a v-if="store.race" class="menu-item" role="menuitem" :href="`/race/${store.race.slug}`" target="_blank" rel="noopener" @click="accountOpen = false">Watch the race 🏇</a>
             <button v-if="exercise" class="menu-item" type="button" role="menuitem" @click="startTour(); accountOpen = false">Take the tour</button>
             <button v-if="!store.race" class="menu-item" type="button" role="menuitem" @click="store.personaPicker = true; accountOpen = false">Learning as: <strong>{{ personaLabel }}</strong> · switch</button>
+            <button v-if="!store.race && languageChoice" class="menu-item" type="button" role="menuitem" @click="store.languagePicker = true; accountOpen = false">Building in: <strong>{{ languageLabel(course, store.language.id) }}</strong> · switch</button>
             <button class="menu-item" type="button" role="menuitem" @click="openFeedback(); accountOpen = false">Send feedback</button>
             <button class="menu-item" type="button" role="menuitem" @click="store.theme = store.theme === 'dark' ? 'light' : 'dark'; accountOpen = false">{{ store.theme === "dark" ? "Light mode" : "Dark mode" }}</button>
             <a v-if="store.user.admin" class="menu-item" role="menuitem" href="#/admin" @click="accountOpen = false">Admin panel</a>
@@ -363,6 +371,7 @@ watch(() => store.user, (user) => !user && closeFeedback());
   <RaceFinish v-if="finishOpen" />
 
   <PersonaChoice v-if="personaFirst || store.personaPicker" :switching="!personaFirst" @close="store.personaPicker = false" />
+  <LanguageChoice v-else-if="languageFirst || store.languagePicker" :switching="!languageFirst" @close="store.languagePicker = false" />
 
   <div v-if="store.gateOpen" class="modal-backdrop" @click.self="store.gateOpen = false">
     <div class="modal" role="dialog" aria-modal="true" aria-label="Sign in">

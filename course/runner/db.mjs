@@ -160,6 +160,10 @@ const MIGRATIONS = [
   DROP TABLE racers;
   ALTER TABLE racers_new RENAME TO racers;
   `,
+  // The language a cohort's learners build in (null: Python, until they choose).
+  `
+  ALTER TABLE cohorts ADD COLUMN language TEXT;
+  `,
 ];
 
 export function openDatabase(file) {

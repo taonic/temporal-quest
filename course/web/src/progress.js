@@ -14,6 +14,7 @@ import { computed, reactive, watch } from "vue";
 import { badgeContext, earnedNow, isComingSoon, missingFor as badgeMissingFor } from "./badges.js";
 import { addPick, xpFor } from "./challenge.js";
 import { QUESTION_XP, quizXp } from "./race/rules.js";
+import { keepLanguage, moduleLanguage } from "./language.js";
 import { keepPersona } from "./persona.js";
 import { api, course, fullCourse, load, save, store } from "./store.js";
 
@@ -87,6 +88,8 @@ export const progress = reactive({
   lastBadges: null,
   // Each boss fight's result: [{ module, won, hearts, at }] (Flawless: a win with every heart).
   bossResults: load("boss-results", []),
+  // Each module's languages it was passed in: { F2: ["python", "typescript"] } (Polyglot).
+  passedIn: load("passed-in", {}),
 });
 
 watch(() => progress.completed, (ids) => save("modules", ids), { deep: true });
@@ -95,6 +98,7 @@ watch(() => progress.badges, (badges) => save("badges", badges), { deep: true })
 watch(() => progress.attempts, (picks) => save("attempts", picks), { deep: true });
 watch(() => progress.path, (id) => save("path", id));
 watch(() => progress.bossResults, (results) => save("boss-results", results), { deep: true });
+watch(() => progress.passedIn, (passed) => save("passed-in", passed), { deep: true });
 
 // --- The server's copy ------------------------------------------------------------------------
 
@@ -137,7 +141,11 @@ async function syncFromServer() {
       body: owner && !mine ? {} : { completed: progress.completed, attempts: progress.attempts, path: progress.path },
     });
     const unsent = mine ? progress.completed.filter((id) => !server.completed.includes(id)) : [];
-    for (const id of unsent) track("module_passed", id);
+    // Each with a language it was passed in here (none: Python).
+    for (const id of unsent) {
+      const lang = (progress.passedIn[id] ?? []).find((l) => l !== "python");
+      track("module_passed", id, lang ? { lang } : null);
+    }
     syncing = true;
     progress.completed = [...server.completed, ...unsent].filter((id) => anyModuleById.has(id));
     progress.attempts = mine ? { ...progress.attempts, ...server.attempts } : server.attempts;
@@ -151,6 +159,13 @@ async function syncFromServer() {
     // this page's URL set one; one chosen here before signing in goes up.
     if (server.persona && server.persona !== store.persona.id && !store.persona.fromUrl) choosePersona(server.persona, { record: false });
     else if (store.persona.chosen && server.persona !== store.persona.id) track("persona_set", null, { persona: store.persona.id });
+    // The language too: theirs (or their cohort's) wins, unless this page's URL set one.
+    const offered = (course.languages ?? []).some((l) => l.id === server.language);
+    if (offered && server.language !== store.language.id && !store.language.fromUrl) chooseLanguage(server.language, { record: false });
+    else if (store.language.chosen && server.language !== store.language.id) track("language_set", null, { language: store.language.id });
+    const passed = { ...(mine ? progress.passedIn : {}) };
+    for (const [id, langs] of Object.entries(server.passedIn ?? {})) passed[id] = [...new Set([...(passed[id] ?? []), ...langs])];
+    progress.passedIn = passed;
   } catch {
     /* the page keeps this browser's progress */
   } finally {
@@ -205,7 +220,13 @@ export const levelXp = computed(() => xp.value % LEVEL_XP);
 export const badges = course.badges ?? [];
 export const badgesById = new Map(badges.map((b) => [b.id, b]));
 const badgeCtx = badgeContext(course.modules, (id) => rightChoice(id));
-const badgeState = () => ({ completed: progress.completed, attempts: progress.attempts, solutionUsed: progress.solutionUsed, bossResults: progress.bossResults });
+const badgeState = () => ({
+  completed: progress.completed,
+  attempts: progress.attempts,
+  solutionUsed: progress.solutionUsed,
+  bossResults: progress.bossResults,
+  passedIn: progress.passedIn,
+});
 // The badges the learner meets now. Any not kept yet are kept, quietly (what the server sent, or
 // a sign-in's progress): only one earned on this page gets an earn moment (complete, below).
 const meetsNow = computed(() => earnedNow(badges, badgeCtx, badgeState()));
@@ -323,11 +344,29 @@ export function opensAfter(branch) {
 
 export function complete(id) {
   const m = modulesById.get(id);
-  if (!m || isDone(id)) return;
+  if (!m) return;
+  // The language they passed it in: theirs, or the module's first where it doesn't come in theirs.
+  const lang = moduleLanguage(m, store.language.id);
+  const fresh = !(progress.passedIn[id] ?? []).includes(lang);
+  if (fresh) progress.passedIn = { ...progress.passedIn, [id]: [...(progress.passedIn[id] ?? []), lang] };
+  const data = lang === "python" ? null : { lang };
+  if (isDone(id)) {
+    // Passed before, in another language: no XP again, but recorded (Polyglot).
+    if (fresh) {
+      track("module_passed", id, data);
+      earnMoment();
+    }
+    return;
+  }
   const before = level.value;
   progress.completed = [...progress.completed, id];
   progress.lastGain = { id, amount: xpOf(id), levelUp: level.value > before ? level.value : null, at: Date.now() };
-  track("module_passed", id);
+  track("module_passed", id, data);
+  earnMoment();
+}
+
+// The badges just earned, kept, with their earn moment.
+function earnMoment() {
   const fresh = meetsNow.value.filter((b) => !(b in progress.badges));
   if (fresh.length) {
     const at = Date.now();
@@ -401,6 +440,22 @@ watch(
   },
 );
 
+// The learner's language: kept (and recorded, while signed in). The course in another language
+// is worked out as the page loads, so it loads again, where it was.
+export function chooseLanguage(id, { record = true } = {}) {
+  if (!(course.languages ?? []).some((l) => l.id === id)) return;
+  keepLanguage(id);
+  if (record) track("language_set", null, { language: id });
+  if (id === course.language) {
+    store.language = { ...store.language, chosen: true };
+    return;
+  }
+  const url = new URL(window.location.href);
+  url.searchParams.delete("lang");
+  window.location.replace(url.toString());
+  if (url.toString() === window.location.href) window.location.reload();
+}
+
 // The learner's persona: kept (and recorded, while signed in). Another persona's course is another
 // site, so the page loads again, on the map (the module open may not be in it).
 export function choosePersona(id, { record = true } = {}) {
@@ -426,6 +481,7 @@ export function forgetProgress() {
   progress.attempts = {};
   progress.solutionUsed = [];
   progress.badges = {};
+  progress.passedIn = {};
 }
 
 // The boss at the end of a module's branch, when it's playable (and isn't the module itself).

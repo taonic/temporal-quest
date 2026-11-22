@@ -110,7 +110,8 @@ def modules() -> dict[str, Module]:
                 check=m.get("check") or {"kind": "pending"},
                 savepoint=m.get("savepoint") or {},
                 worker=m.get("worker", meta.get("worker")),
-                languages=tuple(meta["languages"]),
+                # Its own languages narrow its branch's: a module a language doesn't have yet.
+                languages=tuple(m.get("languages") or meta["languages"]),
                 langs=m.get("langs") or {},
                 branch_langs=meta.get("langs") or {},
             )

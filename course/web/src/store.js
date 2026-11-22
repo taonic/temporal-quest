@@ -5,12 +5,14 @@ import { reactive, watch } from "vue";
 
 import { forgetWork, storageKey, storagePrefix } from "./forget.js";
 import fullCourse from "./generated/course-data.json";
+import { courseIn, readLanguage } from "./language.js";
 import { courseFor, readPersona } from "./persona.js";
 
-// The course as the learner's persona sees it (persona.js): what every page lists comes from it.
-// fullCourse has every persona's.
+// The course as the learner's persona sees it (persona.js), in the language they build in
+// (language.js): what every page lists comes from it. fullCourse has every persona's.
 const persona = readPersona(fullCourse);
-const course = courseFor(fullCourse, persona.id);
+const language = readLanguage(fullCourse);
+const course = courseIn(courseFor(fullCourse, persona.id), language.id);
 
 export { course, fullCourse, storageKey, storagePrefix };
 
@@ -66,6 +68,11 @@ export const store = reactive({
   persona,
   // The persona choice, opened to switch (the account menu, the map).
   personaPicker: false,
+  // The language they build in: { id, chosen, fromUrl } (language.js). Asked only once the
+  // course offers more than Python (LanguageChoice).
+  language,
+  // The language choice, opened to switch (the account menu).
+  languagePicker: false,
   theme: initialTheme(),
   toast: "",
   // A badge's earn moment is on screen (EarnMoment.vue).
@@ -245,11 +252,13 @@ export function runWorkerCommand(command) {
 }
 
 // Whether the running worker is the one a worker command starts: the same worker, started with
-// the same settings (the runner reports those named in its WORKER_ENV).
+// the same settings (the runner reports those named in its WORKER_ENV). The runner reports the
+// worker's command, or (a Python worker) its name: hello-worker is `uv run hello-worker`.
 export function isRunningCommand(command) {
-  const match = command.match(/^((?:\w+=\S+\s+)*)uv run ((?:hello|travel)-worker)\b/);
+  const match = command.match(/^((?:\w+=\S+\s+)*)(.+)$/);
   const { running, name, env = {} } = store.worker;
-  if (!match || !running || name !== match[2]) return false;
+  const runningCommand = store.worker.command ?? (name ? `uv run ${name}` : null);
+  if (!match || !running || match[2].trim() !== runningCommand) return false;
   const wanted = Object.fromEntries(match[1].split(/\s+/).filter(Boolean).map((a) => a.split("=")));
   return [...new Set([...Object.keys(wanted), ...Object.keys(env)])].every((key) => (wanted[key] ?? "") === (env[key] ?? ""));
 }
@@ -292,13 +301,14 @@ export function setTrips({ trips, starter }) {
   store.trips = { list: trips, starter, pending };
 }
 
-// Starts the trip in the commands terminal, so you see it happen. A hello-start still waiting
-// for an earlier trip there gets a Ctrl-C first: its workflow carries on without it.
-export function startTrip(key) {
+// Starts the trip in the commands terminal, so you see it happen, with the exercise's starter
+// (in the learner's language). A starter still waiting for an earlier trip there gets a Ctrl-C
+// first: its workflow carries on without it.
+export function startTrip(key, starter = "uv run hello-start") {
   if (store.trips.pending[key]) return;
   const known = (store.trips.list ?? []).map((t) => t.id);
   store.trips = { ...store.trips, pending: { ...store.trips.pending, [key]: known } };
-  runInTerminal("commands", [`uv run hello-start ${key}`], { interrupt: store.trips.starter });
+  runInTerminal("commands", [`${starter} ${key}`], { interrupt: store.trips.starter });
   for (const ms of [1500, 3000, 6000, 10000]) setTimeout(() => hooks.poll?.(), ms);
   clearTimeout(pendingTimers[key]);
   pendingTimers[key] = setTimeout(() => {
@@ -340,9 +350,9 @@ export async function openWorkflow(prefix, tab = null, update = null) {
 const TRIP_ENDED = { completed: "completed", failed: "failed", terminated: "terminated", canceled: "cancelled", timed_out: "timed out" };
 
 // How a trip button shows its trip: its latest workflow, and what you can do with it.
-export function tripView(key, live) {
+export function tripView(key, live, starter = "uv run hello-start") {
   const route = key.replace(" ", " → ");
-  const start = { act: "start", label: "Start", title: `Start it: uv run hello-start ${key}, in the commands terminal` };
+  const start = { act: "start", label: "Start", title: `Start it: ${starter} ${key}, in the commands terminal` };
   if (!live || store.trips.list === null) return { state: "unknown", label: `Trip ${route}`, actions: [], title: "Start your sandbox first" };
   if (store.trips.pending[key]) return { state: "pending", label: `Starting ${route}…`, actions: [], title: "Waiting for Temporal to record it" };
   const trip = latestTrip(key);

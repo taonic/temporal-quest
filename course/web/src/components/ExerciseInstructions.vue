@@ -33,6 +33,7 @@ import {
   sendToAgent,
   startAgentSession,
   startTrip,
+  course,
   store,
   toast,
   restartWorker,
@@ -48,6 +49,7 @@ import {
   workerToggleView,
 } from "../store.js";
 import { choosePersona, complete, isDone, moduleHref, moduleName, moduleOfBeat, modulesById, nextModule, pick, progress, shownMaxXp, shownXpOf, worldCheckOf } from "../progress.js";
+import { languageLabel } from "../language.js";
 import { findSnippet } from "../snippets.js";
 import { streamIn } from "../streaming.js";
 import AskSetupCard from "./AskSetupCard.vue";
@@ -702,7 +704,7 @@ watch([() => store.board, () => props.live, () => store.sandbox.state, page, bea
 // The trip buttons the build put in place of `uv run hello-start …`: each trip's workflow.
 function paintTrips() {
   for (const group of scroller.value?.querySelectorAll("[data-trip]") ?? []) {
-    const view = tripView(group.dataset.trip, props.live);
+    const view = tripView(group.dataset.trip, props.live, props.exercise.starter ?? undefined);
     group.className = `trip-toggle is-${view.state}`;
     group.title = view.title;
     group.replaceChildren(
@@ -807,7 +809,7 @@ function onClick(event) {
   } else if (target.matches("button[data-trip-act]")) {
     const key = target.closest("[data-trip]").dataset.trip;
     if (target.dataset.tripAct === "open") openTrip(key);
-    else startTrip(key);
+    else startTrip(key, props.exercise.starter ?? undefined);
   } else if (target.matches("a[data-pane], button[data-pane]")) {
     event.preventDefault();
     if (!props.live) return toast("Start your sandbox to open it.");
@@ -857,6 +859,11 @@ function onClick(event) {
           {{ isBoard ? exercise.title : `${label(exercise)} · ${exercise.title}` }}
           <span v-if="exercise.bonus" class="bonus-badge" title="A bonus exercise: do it if you have the time">bonus</span>
           <span v-if="passed" class="passed-badge" title="Your check passed">✓ passed</span>
+          <span
+            v-if="exercise.language && exercise.language !== store.language.id"
+            class="bonus-badge"
+            :title="`This one doesn't come in ${languageLabel(course, store.language.id)} yet: it's in ${languageLabel(course, exercise.language)}`"
+          >in {{ languageLabel(course, exercise.language) }}</span>
         </p>
         <span v-if="steps.length" class="step-progress-count"><template v-if="laps.length > 1">Lap {{ lapAt + 1 }} of {{ laps.length }} · </template>{{ done }}/{{ steps.length }}</span>
         <button v-if="exercise.scripts.reset" class="guide-restart" type="button" :title="mode === 'browser' ? 'Start this exercise over in a new sandbox, back at the first step' : 'Start this exercise over: its code as it starts, fresh sessions, back to the first step'" @click="startOver">

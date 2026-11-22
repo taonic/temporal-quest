@@ -104,7 +104,7 @@ test("the course's badges: a tier badge per named tier, a boss badge per boss, a
     assert.ok(boss.name.length <= CLASS_TITLE_MAX);
   }
   assert.equal(course.badges.find((b) => b.id === "fundamentals-1").criteria, "Pass F1–F7, FC1 and FC2");
-  assert.deepEqual(course.badges.filter((b) => b.kind === "skill").map((b) => b.id), ["clean-run", "no-peeking", "flawless", "explorer", "cross-team", ...ESSENTIALS_MODULE_BADGES, ...DEVELOPER_MILESTONES]);
+  assert.deepEqual(course.badges.filter((b) => b.kind === "skill").map((b) => b.id), ["clean-run", "no-peeking", "flawless", "explorer", "polyglot", "cross-team", ...ESSENTIALS_MODULE_BADGES, ...DEVELOPER_MILESTONES]);
   // Essentials' module badges: one per module, E1 to E8, each earned by passing it.
   const modules = ESSENTIALS_MODULE_BADGES.map((id) => course.badges.find((b) => b.id === id));
   assert.deepEqual(modules.map((b) => [b.rule, b.module]), ["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8"].map((m) => ["pass", m]));

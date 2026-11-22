@@ -14,7 +14,7 @@ import { solvedAt } from "./challenge.js";
 // A boss's hearts: a win with all of them left is Flawless.
 export const HEARTS = 3;
 
-export const SKILL_RULES = ["clean-run", "no-peeking", "flawless", "explorer", "pass"];
+export const SKILL_RULES = ["clean-run", "no-peeking", "flawless", "explorer", "pass", "polyglot"];
 
 // What the rules need to know about the course, worked out once: `modules` as course.modules
 // lists them, and each challenge's right choice.
@@ -48,7 +48,7 @@ export function isComingSoon(badge, ctx) {
 }
 
 // Does the learner meet a badge's criteria now? `state`: { completed, attempts, solutionUsed,
-// bossResults: [{ won, hearts }] }.
+// bossResults: [{ won, hearts }], passedIn: { F2: ["python", "typescript"] } }.
 export function meets(badge, ctx, state) {
   const done = state.completed instanceof Set ? state.completed : new Set(state.completed);
   const branchList = [...ctx.branches.values()];
@@ -75,6 +75,9 @@ export function meets(badge, ctx, state) {
     }
     case "flawless":
       return (state.bossResults ?? []).some((r) => r.won && r.hearts >= HEARTS);
+    // The same module with a code check, passed in two languages.
+    case "polyglot":
+      return Object.entries(state.passedIn ?? {}).some(([id, langs]) => ctx.byId.get(id)?.check === "code" && new Set(langs).size >= 2);
     default:
       return false;
   }

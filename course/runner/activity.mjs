@@ -16,7 +16,7 @@ import { badgeContext, earnedNow } from "../web/src/badges.js";
 import { xpFor } from "../web/src/challenge.js";
 import { transaction } from "./db.mjs";
 
-export const BROWSER_EVENTS = new Set(["module_opened", "module_passed", "check_failed", "challenge_pick", "quiz_pick", "boss_result", "path_set", "persona_set", "solution_used"]);
+export const BROWSER_EVENTS = new Set(["module_opened", "module_passed", "check_failed", "challenge_pick", "quiz_pick", "boss_result", "path_set", "persona_set", "language_set", "solution_used"]);
 // The events that can change which badges are earned.
 const BADGE_INPUTS = new Set(["module_passed", "challenge_pick", "boss_result", "solution_used"]);
 // A heartbeat counts for at most this much time on its module (one every 60s, with slack).
@@ -51,6 +51,7 @@ export function catalogOf(data) {
   }
   const paths = new Map((data?.paths ?? []).map((p) => [p.id, p]));
   const personas = new Set((data?.personas ?? []).map((p) => p.id));
+  const languages = new Set((data?.languages ?? [{ id: "python" }]).map((l) => l.id));
   const badges = data?.badges ?? [];
   return {
     loaded: Boolean(data),
@@ -64,6 +65,8 @@ export function catalogOf(data) {
     knows: (id) => (data ? modules.has(id) : /^[A-Za-z0-9-]{1,40}$/.test(String(id ?? ""))),
     knowsPath: (id) => (data ? paths.has(id) : /^[a-z0-9-]{1,60}$/.test(String(id ?? ""))),
     knowsPersona: (id) => (data ? personas.has(id) : /^[a-z-]{1,30}$/.test(String(id ?? ""))),
+    // A language the course offers learners (course.languages).
+    knowsLanguage: (id) => (data ? languages.has(id) : /^[a-z]{1,20}$/.test(String(id ?? ""))),
     // The persona a path is for: a cohort's path sets its learners' persona.
     personaOfPath: (id) => paths.get(id)?.personas?.[0] ?? null,
     xpOf(id, attempts) {
@@ -74,8 +77,9 @@ export function catalogOf(data) {
   };
 }
 
-// Progress from a learner's events, in order: { completed, attempts, path, persona, xp,
-// solutionUsed, badges, unrecorded }.
+// Progress from a learner's events, in order: { completed, attempts, path, persona, language,
+// passedIn, xp, solutionUsed, badges, unrecorded }. passedIn: each module's languages it was passed
+// in (a module_passed's `lang`, Python when it has none), for Polyglot.
 //
 // badges: [{ id, at }], every badge earned, oldest first: those recorded (badge_earned), and
 // those the events earn, at the event that earned each. A badge counts once its criteria were
@@ -90,21 +94,27 @@ export function deriveProgress(events, catalog) {
   const derived = new Map();
   let path = null;
   let persona = null;
+  let language = null;
+  const passedIn = {};
   for (const e of events) {
     const data = typeof e.data === "string" ? JSON.parse(e.data || "{}") : (e.data ?? {});
-    if (e.type === "module_passed" && e.module_id && !completed.includes(e.module_id)) completed.push(e.module_id);
-    else if (e.type === "challenge_pick" && e.module_id && data.choice) {
+    if (e.type === "module_passed" && e.module_id) {
+      if (!completed.includes(e.module_id)) completed.push(e.module_id);
+      const lang = typeof data.lang === "string" ? data.lang : "python";
+      if (!(passedIn[e.module_id] ?? []).includes(lang)) passedIn[e.module_id] = [...(passedIn[e.module_id] ?? []), lang];
+    } else if (e.type === "challenge_pick" && e.module_id && data.choice) {
       const picks = attempts[e.module_id] ?? [];
       const right = catalog.rightChoice(e.module_id);
       // As the page records them (challenge.js addPick): nothing after the right one, no repeats.
       if (!picks.includes(data.choice) && !(right && picks.includes(right))) attempts[e.module_id] = [...picks, data.choice];
     } else if (e.type === "path_set") path = data.path ?? null;
     else if (e.type === "persona_set") persona = data.persona ?? null;
+    else if (e.type === "language_set") language = data.language ?? null;
     else if (e.type === "solution_used" && e.module_id && !solutionUsed.includes(e.module_id)) solutionUsed.push(e.module_id);
     else if (e.type === "boss_result" && e.module_id) bossResults.push({ won: Boolean(data.won), hearts: Number(data.hearts) || 0 });
     else if (e.type === "badge_earned" && data.badge && !recorded.has(data.badge)) recorded.set(data.badge, data.earnedAt ?? e.at);
     if (BADGE_INPUTS.has(e.type) && catalog.badges?.length) {
-      for (const id of earnedNow(catalog.badges, catalog.badgeContext, { completed, attempts, solutionUsed, bossResults })) {
+      for (const id of earnedNow(catalog.badges, catalog.badgeContext, { completed, attempts, solutionUsed, bossResults, passedIn })) {
         if (!derived.has(id)) derived.set(id, e.at ?? null);
       }
     }
@@ -114,7 +124,7 @@ export function deriveProgress(events, catalog) {
   const earned = new Map([...derived, ...recorded].filter(([id]) => !catalog.badgesById || catalog.badgesById.has(id)));
   const badges = [...earned].map(([id, at]) => ({ id, at })).sort((a, b) => (a.at ?? 0) - (b.at ?? 0));
   const unrecorded = badges.filter((b) => !recorded.has(b.id)).map((b) => b.id);
-  return { completed, attempts, path, persona, xp, solutionUsed, badges, unrecorded };
+  return { completed, attempts, path, persona, language, passedIn, xp, solutionUsed, badges, unrecorded };
 }
 
 export class Activity {
@@ -143,6 +153,8 @@ export class Activity {
           if (e.data?.path !== null && !this.catalog.knowsPath(e.data?.path)) continue;
         } else if (e.type === "persona_set") {
           if (!this.catalog.knowsPersona(e.data?.persona)) continue;
+        } else if (e.type === "language_set") {
+          if (!this.catalog.knowsLanguage(e.data?.language)) continue;
         } else if (!this.catalog.knows(moduleId)) continue;
         const data = e.data && typeof e.data === "object" ? e.data : null;
         if (data && JSON.stringify(data).length > 2000) continue;
@@ -159,13 +171,15 @@ export class Activity {
   }
 
   // A learner's progress. The path is the one they picked, else their cohort's; the persona is
-  // the one they chose, else their cohort's path's (null: not chosen). Badges earned and not yet
-  // recorded are recorded now (kept from then on).
-  progress(userId, cohortPath = null) {
+  // the one they chose, else their cohort's path's (null: not chosen); the language, the one they
+  // chose, else their cohort's (null: not chosen, Python). Badges earned and not yet recorded are
+  // recorded now (kept from then on).
+  progress(userId, cohortPath = null, cohortLanguage = null) {
     const { unrecorded, ...derived } = this.awardBadges(userId);
     const picked = this.db.prepare("SELECT 1 FROM events WHERE user_id = ? AND type = 'path_set' LIMIT 1").get(userId);
     const path = picked ? derived.path : (cohortPath ?? null);
-    return { ...derived, path, persona: derived.persona ?? (cohortPath ? this.catalog.personaOfPath(cohortPath) : null) };
+    const language = derived.language ?? (this.catalog.knowsLanguage(cohortLanguage) ? cohortLanguage : null);
+    return { ...derived, path, persona: derived.persona ?? (cohortPath ? this.catalog.personaOfPath(cohortPath) : null), language };
   }
 
   // Records a badge_earned event for each badge the learner's events earn that has none yet,

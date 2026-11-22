@@ -5,6 +5,7 @@
 #   flawless    a boss beaten without losing a heart
 #   explorer    a module passed in every branch
 #   pass        the module named by `module`, or every one of a milestone's `modules`
+#   polyglot    a module with a code check passed in two languages (shown once there's a second)
 # `personas`: who sees it (none: everyone). Essentials has one branch and no solutions, so No
 # Peeking, Explorer and Cross-Team are the Developer persona's.
 # Tier badges are named in each branch.md, under its tier; boss badges are its classTitle.
@@ -30,6 +31,12 @@
   icon: compass
   rule: explorer
   criteria: Pass a module in every branch
+- id: polyglot
+  personas: [developer]
+  name: Polyglot
+  icon: brackets
+  rule: polyglot
+  criteria: Pass the same module in two languages
 - id: cross-team
   personas: [developer]
   name: Cross-Team

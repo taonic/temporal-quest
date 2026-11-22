@@ -217,6 +217,7 @@ export class Accounts {
         id: c.id,
         name: c.name,
         path: c.path,
+        language: c.language ?? null,
         endsAt: c.ends_at,
         allowanceMinutes: c.allowance_minutes,
         builtin: Boolean(c.builtin),
@@ -225,10 +226,11 @@ export class Accounts {
       }));
   }
 
-  saveCohort({ id, name, path, endsAt, allowanceMinutes }, admin) {
+  saveCohort({ id, name, path, language, endsAt, allowanceMinutes }, admin) {
     const clean = {
       name: String(name ?? "").trim().slice(0, 80),
       path: path ? String(path) : null,
+      language: /^[a-z]{1,20}$/.test(String(language ?? "")) ? String(language) : null,
       endsAt: endsAt ? Number(endsAt) : null,
       allowance: Math.max(0, Math.min(24 * 60, Math.round(Number(allowanceMinutes ?? DEFAULT_ALLOWANCE_MINUTES)))),
     };
@@ -239,13 +241,15 @@ export class Accounts {
         const cohort = this.cohort(id);
         // The built-in cohort keeps its name and never ends.
         if (cohort.builtin) Object.assign(clean, { name: cohort.name, endsAt: null });
-        this.db.prepare("UPDATE cohorts SET name = ?, path = ?, ends_at = ?, allowance_minutes = ? WHERE id = ?").run(clean.name, clean.path, clean.endsAt, clean.allowance, cohort.id);
+        this.db
+          .prepare("UPDATE cohorts SET name = ?, path = ?, language = ?, ends_at = ?, allowance_minutes = ? WHERE id = ?")
+          .run(clean.name, clean.path, clean.language, clean.endsAt, clean.allowance, cohort.id);
         this.record(null, "cohort_saved", null, { by: admin, cohort: clean.name });
         return this.cohort(cohort.id);
       }
       const row = this.db
-        .prepare("INSERT INTO cohorts (name, path, ends_at, allowance_minutes, created_at) VALUES (?, ?, ?, ?, ?)")
-        .run(clean.name, clean.path, clean.endsAt, clean.allowance, this.now());
+        .prepare("INSERT INTO cohorts (name, path, language, ends_at, allowance_minutes, created_at) VALUES (?, ?, ?, ?, ?, ?)")
+        .run(clean.name, clean.path, clean.language, clean.endsAt, clean.allowance, this.now());
       this.record(null, "cohort_created", null, { by: admin, cohort: clean.name });
       return this.cohort(row.lastInsertRowid);
     } catch (err) {
@@ -343,7 +347,7 @@ export class Accounts {
       needsProfile: !name || !role,
       allowed: access.allowed,
       ended: access.ended,
-      cohort: access.cohort ? { name: access.cohort.name, path: access.cohort.path } : null,
+      cohort: access.cohort ? { name: access.cohort.name, path: access.cohort.path, language: access.cohort.language ?? null } : null,
       request: request ? { status: request.status, reason: request.reason } : null,
     };
   }

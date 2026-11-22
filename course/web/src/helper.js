@@ -108,7 +108,7 @@ export function sharedFile() {
 // selection.
 function pageContext(step = null) {
   const exercise = currentExercise();
-  const context = { mode: effectiveMode(), page: store.route.page, persona: store.persona.id };
+  const context = { mode: effectiveMode(), page: store.route.page, persona: store.persona.id, language: store.language.id };
   if (exercise) context.exercise = exercise.id;
   if (step) {
     context.exercise = step.exercise;

@@ -52,6 +52,7 @@ export function createAdmin({ accounts, activity, feedback, manager, mailer, rea
         xp: progress.xp,
         path: progress.path,
         persona: progress.persona,
+        language: progress.language,
         where: activity.whereIs(user.id, progress.completed),
         sandboxMinutes: activity.sandboxMinutesToday(user.id),
         allowanceMinutes: access.cohort?.allowance_minutes ?? DEFAULT_ALLOWANCE_MINUTES,
@@ -65,7 +66,7 @@ export function createAdmin({ accounts, activity, feedback, manager, mailer, rea
     return accounts
       .users({ cohortId })
       .filter(({ user }) => internal || !accounts.isInternal(user.email))
-      .map((u) => ({ ...u, progress: activity.progress(u.user.id, u.access.cohort?.path) }))
+      .map((u) => ({ ...u, progress: activity.progress(u.user.id, u.access.cohort?.path, u.access.cohort?.language) }))
       .filter((u) => !persona || u.progress.persona === persona);
   }
 
@@ -116,11 +117,12 @@ export function createAdmin({ accounts, activity, feedback, manager, mailer, rea
     if (!user) throw fail(404, "No such learner.");
     const access = accounts.accessFor(user.email);
     const events = activity.eventsOf(userId);
-    const progress = activity.progress(userId, access.cohort?.path);
+    const progress = activity.progress(userId, access.cohort?.path, access.cohort?.language);
     const times = activity.moduleTimes(userId);
     const passedAt = {};
     const failedChecks = {};
     const personaChanges = [];
+    const languageChanges = [];
     const bosses = [];
     const sessions = [];
     let helperQuestions = 0;
@@ -132,6 +134,7 @@ export function createAdmin({ accounts, activity, feedback, manager, mailer, rea
       else if (e.type === "check_failed") failedChecks[e.module_id] = (failedChecks[e.module_id] ?? 0) + 1;
       else if (e.type === "boss_result") bosses.push({ moduleId: e.module_id, at: e.at, ...data });
       else if (e.type === "persona_set" && data.persona && data.persona !== personaChanges.at(-1)?.persona) personaChanges.push({ persona: data.persona, at: e.at });
+      else if (e.type === "language_set" && data.language && data.language !== languageChanges.at(-1)?.language) languageChanges.push({ language: data.language, at: e.at });
       else if (e.type === "helper_question") helperQuestions++;
       else if (e.type === "model_calls") modelCalls += data.count ?? 0;
       else if (e.type === "sandbox_started") open = open ?? e.at;
@@ -161,11 +164,16 @@ export function createAdmin({ accounts, activity, feedback, manager, mailer, rea
       // Who they learn as, and each time they chose (or switched).
       persona: progress.persona,
       personaChanges,
+      // The language they build in, and each time they chose (or switched).
+      language: progress.language,
+      languageChanges,
       where: activity.whereIs(userId, progress.completed),
       passed: progress.completed.map((id) => ({
         id,
         title: catalog.modules.get(id)?.title ?? id,
         at: passedAt[id] ?? null,
+        // The languages they passed it in (Python, before there were others).
+        languages: progress.passedIn?.[id] ?? [],
         seconds: times[id] ?? 0,
         failedChecks: failedChecks[id] ?? 0,
       })),
@@ -316,8 +324,8 @@ export function createAdmin({ accounts, activity, feedback, manager, mailer, rea
         requireAdmin(req);
         const rows = learnerRows({ cohortId: url.searchParams.get("cohort") || null, persona: url.searchParams.get("persona") || null, internal: withInternal(url) });
         csv(res, "learners.csv", [
-          ["name", "email", "role", "company", "cohort", "persona", "modules passed", "xp", "last active"],
-          ...rows.map((r) => [r.name, r.email, r.role, r.company, r.cohort?.name, r.persona, r.completed, r.xp, iso(r.where?.lastAt ?? r.lastSeenAt)]),
+          ["name", "email", "role", "company", "cohort", "persona", "language", "modules passed", "xp", "last active"],
+          ...rows.map((r) => [r.name, r.email, r.role, r.company, r.cohort?.name, r.persona, r.language, r.completed, r.xp, iso(r.where?.lastAt ?? r.lastSeenAt)]),
         ]);
       },
 
