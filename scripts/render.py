@@ -1,7 +1,9 @@
 """Render learner code from the authoring masters.
 
 Files under authoring/ hold both the solution and the starter for each TODO, between markers
-(`#` in Python, `//` in Dogwood policies) that name the module whose TODO it is:
+(`#` in Python, `//` in Dogwood policies, TypeScript, Java and C#) that name the module whose
+TODO it is. Python's masters mirror the repo (authoring/hello/… → hello/…); another language's
+are under authoring/langs/<language>/ (→ langs/<language>/…):
 
     # @@solution A4
     ...code learners write in module A4...
@@ -32,7 +34,7 @@ from quests import ROOT, modules  # noqa: E402
 
 AUTHORING = ROOT / "authoring"
 MARKER = re.compile(r"^\s*(?:#|//) @@(solution (\w+)|starter|end)\s*$")
-SUFFIXES = {".py", ".dw"}
+SUFFIXES = {".py", ".dw", ".ts", ".java", ".cs"}
 
 
 @dataclass(frozen=True)

@@ -29,6 +29,10 @@ order: 2                     # its place in lists
 column: 1                    # its column on the map, 1-5 (none: the trunk)
 classTitle: AI Agent Specialist   # its boss badge: at most 20 characters
 worker: uv run travel-worker      # its modules' default worker command
+starter: uv run hello-start       # optional: the command that starts a trip (`uv run hello-start SFO JFK`): a trip button in the browser
+languages: [python, typescript]   # optional: the languages its modules come in, the first its default (none: [python]); see Languages
+langs:                            # each other language's worker and starter commands (both, if the branch has them)
+  typescript: { worker: npm run worker, starter: npm run start -- }
 agentUi: true                     # false: its modules have no Agent UI tab
 numbered: true                    # false: its learners see no module ids (Essentials), so its copy can't name one
 maxWords: 100                     # optional: each of the guide's messages is at most this many words, not counting code (Essentials 100, Fundamentals 150)
@@ -151,6 +155,49 @@ choices:
 **The scenario** is `async def scenario(kit)`. `kit.load()` imports the challenge's file as this choice has it (`kit.load("before")`: without the block at all), `kit.worker([...])` runs a worker on the run's own task queue, `kit.workflow_id(name)` names a workflow, `kit.step(text, kind)` adds a line to the timeline as it happens (`info`, `good`, `bad` or `worker`), `kit.event(text)` notes a history event that matters, and `kit.finish(right, summary, …)` gives the answer. A run takes at most 20 seconds: keep timers and retries short.
 
 In a sandbox, the page types `./quest challenge FC1 B --run X` into the commands terminal when a learner locks a choice in (it's the page's command, not one the guide mentions). It builds the choice's code in a temp copy, runs the scenario against the sandbox's Temporal, prints the timeline, and writes a JSON line a step to `.course/challenges/FC1-B.jsonl` for the page. `uv run python scripts/record_challenges.py [FC1]` records every choice against a fresh dev server, and `scripts/verify_modules.py` fails if a recording is missing or stale, a patch doesn't apply, or a choice didn't come out the way its `right` flag says. Change a challenge, its scenario or the code it varies: record it again.
+
+## Languages
+
+A Developer branch can come in several languages: `python`, `typescript`, `java` and `dotnet` (C#). Its `languages:` lists them, the first being its default, and a learner does each module in the language they chose, or in the branch's default where it doesn't come in theirs. A module is still one module, with one id, map node, XP and check, whatever the language: [ADR 0001](../docs/adr/0001-one-module-several-languages.md) says why. Every language's code keeps one wire contract, so the checks and challenge scenarios stay Python ([hello/CONTRACT.md](../hello/CONTRACT.md), [ADR 0002](../docs/adr/0002-one-wire-contract-python-checks.md)).
+
+**Its text** is shared, but for two things:
+
+- `<!-- lang typescript -->…<!-- /lang -->` is text only that language reads, such as a bullet that names an API. It can't hold a `##` heading: every language has the same beats.
+- Code blocks right after one another (nothing but blank lines between them), each in a different language, are one snippet: the guide shows the learner's. In a branch with several languages, each snippet needs a version in every one of them, or has to sit in one language's block.
+
+````markdown
+```python
+return await workflow.execute_activity(lookup_airport, code, start_to_close_timeout=timedelta(seconds=10))
+```
+
+```typescript
+const { lookup_airport } = proxyActivities<typeof activities>({ startToCloseTimeout: '10 seconds' });
+return await lookup_airport(code);
+```
+
+<!-- lang python -->
+- `start_to_close_timeout`: how long one attempt may take.
+<!-- /lang -->
+<!-- lang typescript -->
+- `startToCloseTimeout`: how long one attempt may take.
+<!-- /lang -->
+````
+
+Code blocks are named `python`, `typescript`, `java` and `csharp` (for `dotnet`).
+
+**Its frontmatter** is its default language's. `langs:` gives what differs in each other language: `files`, `tour`, `tourAfter`, `questions`, `hint` (its check's), `worker`. A module with files, a tour or a code check must give its own in every other language:
+
+```yaml
+langs:
+  typescript:
+    files:
+      - path: langs/typescript/hello/src/workflows.ts
+        editable: true
+    hint: "Look for the TODO in langs/typescript/hello/src/workflows.ts: …"
+    tour: [ … ]
+```
+
+**Its code** in a language other than Python lives under `langs/<language>/`, and its masters under `authoring/langs/<language>/`, with the same `// @@solution F2` markers. `./quest lang typescript` chooses the language locally (it's kept in `.course/lang`), and `./quest` then works on that language's files and runs the checks with `QUEST_LANG=typescript`. `scripts/verify_modules.py` checks each module in each of its branch's languages, and the site's build fails on a snippet, a `langs:` entry or a language block that a language is missing.
 
 ## TODOs and save points
 

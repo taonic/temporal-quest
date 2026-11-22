@@ -31,13 +31,14 @@ from render import blocks, masters, outputs, render, todo_modules  # noqa: E402
 
 from quests import ROOT, closure, modules  # noqa: E402
 
-COPY = ["travel_agent", "hello", "codemode", "concierge", "tests", "policies"]
+COPY = ["travel_agent", "hello", "codemode", "concierge", "tests", "policies", "langs"]
 
 
 def build(solved: set[str]) -> Path:
     tmp = Path(tempfile.mkdtemp(prefix="quest-verify-"))
     for name in COPY:
-        shutil.copytree(ROOT / name, tmp / name, ignore=shutil.ignore_patterns("__pycache__"))
+        if (ROOT / name).exists():
+            shutil.copytree(ROOT / name, tmp / name, ignore=shutil.ignore_patterns("__pycache__"))
     for name in ["pyproject.toml", "agents.toml"]:
         shutil.copy(ROOT / name, tmp / name)
     for path, content in outputs(solved, tmp).items():
@@ -45,11 +46,13 @@ def build(solved: set[str]) -> Path:
     return tmp
 
 
-async def run_check(solved: set[str], tests: list[str]) -> bool:
+async def run_check(solved: set[str], tests: list[str], language: str = "python") -> bool:
     tmp = build(solved)
     # PYTHONPATH puts the rendered copy ahead of the repo's editable install; the Dogwood CLI
-    # stays the repo's own build.
+    # stays the repo's own build. QUEST_LANG: the language the check runs the code in.
     env = {**os.environ, "PYTHONPATH": str(tmp), "DOGWOOD_CLI": str(ROOT / ".dogwood/bin/dogwood")}
+    if language != "python":
+        env["QUEST_LANG"] = language
     try:
         proc = await asyncio.create_subprocess_exec(
             sys.executable, "-m", "pytest", "-q", "-x", "-p", "no:cacheprovider", *tests,
@@ -113,24 +116,27 @@ async def main() -> None:
     print(f"  challenges   ok     {', '.join(challenges())}: recorded, current, and right where they say")
     print(f"  walkthroughs ok     {', '.join(essentials_modules())}: recorded, and current")
     with_todo = todo_modules()
-    cases = [("base", set(), ["tests/test_base.py"], True)]
-    cases.append(("walk", set(closure(["A4"])) | {"A4"}, ["tests/test_walkthroughs.py"], True))
+    cases = [("base", set(), ["tests/test_base.py"], True, "python")]
+    cases.append(("walk", set(closure(["A4"])) | {"A4"}, ["tests/test_walkthroughs.py"], True, "python"))
     for module in modules().values():
         if module.check.get("kind") != "code":
             continue
         before = set(closure([module.id]))
-        if module.id in with_todo:
-            cases.append((f"{module.id} open", before, module.check["tests"], False))
-        cases.append((f"{module.id} solved", before | {module.id}, module.check["tests"], True))
+        # In each of its branch's languages: a TODO there has to matter, and its solution work.
+        for language in module.languages:
+            name = module.id if language == "python" else f"{module.id} {language}"
+            if module.id in with_todo:
+                cases.append((f"{name} open", before, module.check["tests"], False, language))
+            cases.append((f"{name} solved", before | {module.id}, module.check["tests"], True, language))
 
     gate = asyncio.Semaphore(6)  # each check starts its own Temporal dev server
 
     async def limited(case):
         async with gate:
-            return case, await run_check(case[1], case[2])
+            return case, await run_check(case[1], case[2], case[4])
 
     ok = True
-    for (label, solved, _, expected), passed in await asyncio.gather(*map(limited, cases)):
+    for (label, solved, _, expected, _language), passed in await asyncio.gather(*map(limited, cases)):
         ok &= passed == expected
         mark = "" if passed == expected else "   ! expected " + ("pass" if expected else "FAIL")
         print(f"  {label:<12} {'pass' if passed else 'FAIL'}   solved: {','.join(sorted(solved)) or '-'}{mark}")

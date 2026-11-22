@@ -24,8 +24,11 @@ import { fileURLToPath } from "node:url";
 
 import hljs from "highlight.js/lib/core";
 import bash from "highlight.js/lib/languages/bash";
+import csharp from "highlight.js/lib/languages/csharp";
+import java from "highlight.js/lib/languages/java";
 import json from "highlight.js/lib/languages/json";
 import python from "highlight.js/lib/languages/python";
+import typescript from "highlight.js/lib/languages/typescript";
 import MarkdownIt from "markdown-it";
 import YAML from "yaml";
 
@@ -36,6 +39,9 @@ import { SKILL_RULES } from "../web/src/badges.js";
 import { BOARD_ACTIONS, BOARD_STEPS, WORLD_CHECKS } from "../web/src/board.js";
 
 hljs.registerLanguage("python", python);
+hljs.registerLanguage("typescript", typescript);
+hljs.registerLanguage("java", java);
+hljs.registerLanguage("csharp", csharp);
 hljs.registerLanguage("bash", bash);
 hljs.registerLanguage("json", json);
 // Dogwood (Cedar plus temporal conditions), colored as the editor colors a .dw file
@@ -71,21 +77,49 @@ const repoUrl = (process.env.COURSE_REPO_URL ?? "").replace(/\/$/, "");
 
 const MODES = ["browser", "local"];
 
+// The commands the branches name (branch.md's `worker` and `starter`, in each of its languages):
+// which ▶ goes to the worker terminal, and which command is a trip button. Set from the quests
+// when the course is built (useCommands); these are the ones until then.
+const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const anyOf = (commands) => (commands.length ? commands.map(escapeRegex).join("|") : "(?!)");
 // A command typed into the worker terminal rather than the commands terminal when a ▶ is clicked.
-export const WORKER_COMMAND = /^(?:\w+=\S+\s+)*uv run (?:hello|travel)-worker\b/;
+export let WORKER_COMMAND;
+// `uv run hello-start SFO JFK`: in the browser, a trip button, filled in by the page, which
+// knows the trip's workflow (ExerciseInstructions, with tripView in store.js).
+export let HELLO_START;
+// A block of just a worker command, with no settings.
+let PLAIN_WORKER;
+function useCommands(found) {
+  WORKER_COMMAND = new RegExp(`^(?:\\w+=\\S+\\s+)*(?:${anyOf(found.workers)})(?![\\w-])`);
+  HELLO_START = new RegExp(`^(?:${anyOf(found.starters)}) ([A-Za-z]{3}) ([A-Za-z]{3})$`);
+  PLAIN_WORKER = new RegExp(`^(?:${anyOf(found.workers)})$`);
+}
+useCommands({ workers: ["uv run hello-worker", "uv run travel-worker"], starters: ["uv run hello-start"] });
+
+// Every worker and starter command the branches and modules name, in any language.
+function questCommands(branches, modules) {
+  const workers = new Set();
+  const starters = new Set();
+  for (const b of branches) {
+    for (const v of [b, ...Object.values(b.langs ?? {})]) {
+      if (v.worker) workers.add(v.worker);
+      if (v.starter) starters.add(v.starter);
+    }
+  }
+  for (const m of modules.values()) for (const v of [m, ...Object.values(m.langs ?? {})]) if (v.worker) workers.add(v.worker);
+  return { workers: [...workers], starters: [...starters] };
+}
 
 // Inline code that's a command to run as it stands: no <placeholder> to fill in first.
 export function isInlineCommand(text) {
-  return /^(?:\w+=\S+\s+)*(?:uv run |temporal [a-z]|\.\/quest |cat )/.test(text) && !/[<>]/.test(text);
+  if (/[<>]/.test(text)) return false;
+  return /^(?:\w+=\S+\s+)*(?:uv run |temporal [a-z]|\.\/quest |cat )/.test(text) || WORKER_COMMAND.test(text) || HELLO_START.test(text);
 }
 
 // "Stop the worker (Ctrl-C)", "restart the worker", "start the travel agent's worker", "Start
 // the worker again"…
 export const WORKER_PHRASE =
   /\b(?:(?:re)?start|stop)(?:s|ping|ing)? (?:the|your) (?:(?:hello|travel agent's|agent's) )?worker(?: again)?(?: \(Ctrl-C\))?/gi;
-// `uv run hello-start SFO JFK`: in the browser, a trip button, filled in by the page, which
-// knows the trip's workflow (ExerciseInstructions, with tripView in store.js).
-export const HELLO_START = /^uv run hello-start ([A-Za-z]{3}) ([A-Za-z]{3})$/;
 function tripButton(command) {
   const [, origin, destination] = command.match(HELLO_START).map((v) => v.toUpperCase());
   return (
@@ -108,15 +142,150 @@ const WORKER_RESTART = WORKER_TOGGLE.replace("data-worker-toggle", "data-worker-
 
 // A block that starts a line is a paragraph of its own; one that starts mid-line is part of
 // that line, so it loses its own line breaks.
+function keepBlock(keep, match, body, offset, whole) {
+  const ownLine = offset === 0 || whole[offset - 1] === "\n";
+  if (!keep) return ownLine ? "" : match.endsWith("\n") ? "\n" : "";
+  return ownLine ? body.replace(/\n?$/, "\n") : body.replace(/\n+$/, "") + (match.endsWith("\n") ? "\n" : "");
+}
+
 export function applyMode(markdown, mode) {
-  const block = (keep) => (match, body, offset, whole) => {
-    const ownLine = offset === 0 || whole[offset - 1] === "\n";
-    if (!keep) return ownLine ? "" : match.endsWith("\n") ? "\n" : "";
-    return ownLine ? body.replace(/\n?$/, "\n") : body.replace(/\n+$/, "") + (match.endsWith("\n") ? "\n" : "");
-  };
+  const block = (keep) => (match, body, offset, whole) => keepBlock(keep, match, body, offset, whole);
   return markdown
     .replace(/<!--\s*browser\s*\n([\s\S]*?)-->\n?/g, block(mode === "browser"))
     .replace(/<!--\s*local\s*-->\n?([\s\S]*?)<!--\s*\/local\s*-->\n?/g, block(mode === "local"));
+}
+
+// --- Languages ---------------------------------------------------------------------------
+// A branch's modules come in each of its `languages` (branch.md; Python when it lists none), the
+// first its default. A module's text is shared, but for two things: `<!-- lang typescript -->…
+// <!-- /lang -->` is text for one language only, and code blocks one right after another, in
+// different languages, are one snippet with a version for each. Its frontmatter's `langs:` gives
+// what else differs (files, tour, hint…). [ADR 0001](../../docs/adr/0001-one-module-several-languages.md)
+
+export const LANGUAGES = ["python", "typescript", "java", "dotnet"];
+// A code block's language → the course's language. Any other block (bash, text…) is no language's.
+const FENCE_LANGUAGE = { python: "python", py: "python", typescript: "typescript", ts: "typescript", java: "java", csharp: "dotnet", cs: "dotnet" };
+// What a module's `langs.<language>` can give, in place of its own.
+const LANG_KEYS = ["files", "tour", "tourAfter", "questions", "hint", "worker"];
+// What a branch's `langs.<language>` can give.
+const BRANCH_LANG_KEYS = ["worker", "starter"];
+const LANG_BLOCK = /<!--\s*lang\s+([\w-]+)\s*-->\n?([\s\S]*?)<!--\s*\/lang\s*-->\n?/g;
+
+// The code blocks in some lines: where each starts and ends, and its language (null: none).
+function codeFences(lines) {
+  const fences = [];
+  let open = null;
+  lines.forEach((line, i) => {
+    const m = line.match(/^\s*(```|~~~)(.*)$/);
+    if (!m) return;
+    if (open) {
+      fences.push({ ...open, end: i });
+      open = null;
+    } else open = { start: i, lang: FENCE_LANGUAGE[m[2].trim().split(/\s+/)[0]] ?? null };
+  });
+  return fences;
+}
+
+// Code blocks in a language, one right after another (nothing but blank lines between): each
+// run is one snippet, with a version for each language.
+function fenceGroups(lines) {
+  const groups = [];
+  for (const fence of codeFences(lines).filter((f) => f.lang)) {
+    const last = groups.at(-1)?.at(-1);
+    if (last && lines.slice(last.end + 1, fence.start).every((l) => !l.trim())) groups.at(-1).push(fence);
+    else groups.push([fence]);
+  }
+  return groups;
+}
+
+// A module's text as one of its branch's languages reads it: that language's blocks kept, the
+// others' gone, and each snippet down to that language's version.
+export function applyLanguage(markdown, lang, languages) {
+  const text = markdown.replace(LANG_BLOCK, (match, id, body, offset, whole) => keepBlock(id === lang, match, body, offset, whole));
+  if (languages.length < 2) return text;
+  const lines = text.split("\n");
+  const drop = new Set();
+  for (const group of fenceGroups(lines)) {
+    const keep = group.find((f) => f.lang === lang);
+    if (!keep) continue;
+    for (let i = group[0].start; i <= group.at(-1).end; i++) if (i < keep.start || i > keep.end) drop.add(i);
+  }
+  return lines.filter((_, i) => !drop.has(i)).join("\n");
+}
+
+// The build fails on a module's text that a language can't read: a language block for a language
+// its branch doesn't have, or with a heading in it (every language has the same beats), a block
+// that isn't closed, or a snippet without a version for each of its branch's languages.
+export function checkLanguageText(source, body, languages) {
+  for (const [, id, inner] of body.matchAll(LANG_BLOCK)) {
+    if (!languages.includes(id)) throw new Error(`${source}: <!-- lang ${id} --> isn't one of its branch's languages (${languages.join(", ")})`);
+    if (/^##\s/m.test(inner)) throw new Error(`${source}: a heading inside <!-- lang ${id} -->: every language has the same sections`);
+    const other = codeFences(inner.split("\n")).find((f) => f.lang && f.lang !== id);
+    if (other) throw new Error(`${source}: a ${other.lang} code block inside <!-- lang ${id} -->`);
+  }
+  // Each language block's lines kept, but not blank, so they still part the snippets around them.
+  const masked = body.replace(LANG_BLOCK, (match) => match.replace(/[^\n]+/g, "·"));
+  if (/<!--\s*\/?lang\b/.test(masked)) throw new Error(`${source}: a <!-- lang … --> block isn't closed with <!-- /lang -->`);
+  for (const group of fenceGroups(masked.split("\n"))) {
+    const where = `${source}: the code block at line ${group[0].start + 1} of its text`;
+    const langs = group.map((f) => f.lang);
+    const foreign = langs.find((l) => !languages.includes(l));
+    if (foreign) throw new Error(`${where} is ${foreign}, which isn't one of its branch's languages (${languages.join(", ")})`);
+    if (languages.length < 2) continue;
+    const twice = langs.find((l, i) => langs.indexOf(l) !== i);
+    if (twice) throw new Error(`${where} has two ${twice} versions: put some text between two snippets`);
+    const missing = languages.filter((l) => !langs.includes(l));
+    if (missing.length) throw new Error(`${where} has no ${missing.join(" or ")} version: put one right after it, or put it in <!-- lang ${langs[0]} -->`);
+  }
+}
+
+// A branch's languages and what it gives each one, checked.
+export function checkBranchLanguages(source, branch) {
+  const languages = branch.languages;
+  if (!Array.isArray(languages) || !languages.length) throw new Error(`${source}: languages should be a list, such as [python, typescript]`);
+  for (const l of languages) if (!LANGUAGES.includes(l)) throw new Error(`${source}: language ${l} isn't one of ${LANGUAGES.join(", ")}`);
+  if (new Set(languages).size !== languages.length) throw new Error(`${source}: a language is listed twice`);
+  for (const [l, given] of Object.entries(branch.langs ?? {})) {
+    if (!languages.slice(1).includes(l)) throw new Error(`${source}: langs.${l}, but ${l} isn't one of its other languages (${languages.slice(1).join(", ") || "none"})`);
+    for (const key of Object.keys(given ?? {})) if (!BRANCH_LANG_KEYS.includes(key)) throw new Error(`${source}: langs.${l}.${key} isn't one of ${BRANCH_LANG_KEYS.join(", ")}`);
+  }
+  for (const l of languages.slice(1)) {
+    for (const key of BRANCH_LANG_KEYS) if (branch[key] && !branch.langs?.[l]?.[key]) throw new Error(`${source}: no langs.${l}.${key}, the ${key} command in ${l}`);
+  }
+}
+
+// A module's `langs:`, checked against its branch's languages: what a language gives in place of
+// the module's own, and what it has to (its own files, tour and hint, when the module has them).
+export function checkModuleLanguages(source, module, languages) {
+  for (const [l, given] of Object.entries(module.langs ?? {})) {
+    if (!languages.slice(1).includes(l)) throw new Error(`${source}: langs.${l}, but ${l} isn't one of its branch's other languages (${languages.slice(1).join(", ") || "none"})`);
+    for (const key of Object.keys(given ?? {})) if (!LANG_KEYS.includes(key)) throw new Error(`${source}: langs.${l}.${key} isn't one of ${LANG_KEYS.join(", ")}`);
+  }
+  for (const l of languages.slice(1)) {
+    const given = module.langs?.[l] ?? {};
+    if (module.files?.length && !given.files) throw new Error(`${source}: no langs.${l}.files, its files in ${l}`);
+    if (module.tour?.length && !given.tour) throw new Error(`${source}: no langs.${l}.tour, its code tour in ${l}`);
+    if (module.check?.kind === "code" && !given.hint) throw new Error(`${source}: no langs.${l}.hint, its check's hint in ${l}`);
+  }
+}
+
+// A module as one language has it: its text in that language, and what its `langs:` gives in
+// place of its own. Its branch's first language is the module as written.
+function moduleIn(module, lang, branch) {
+  if (module.kind !== "module") return module;
+  const body = applyLanguage(module.body, lang, branch.languages);
+  if (lang === branch.languages[0]) return body === module.body ? module : { ...module, body };
+  const given = module.langs?.[lang] ?? {};
+  return {
+    ...module,
+    body,
+    files: given.files ?? module.files,
+    tour: given.tour ?? module.tour,
+    tourAfter: given.tourAfter ?? module.tourAfter,
+    questions: given.questions ?? module.questions,
+    worker: given.worker ?? branch.langs?.[lang]?.worker ?? null,
+    check: given.hint ? { ...module.check, hint: given.hint } : module.check,
+  };
 }
 
 export function parseFrontmatter(markdown) {
@@ -461,7 +630,7 @@ function createRenderer() {
     if (state.env.mode !== "browser") return;
     for (let i = state.tokens.length - 1; i >= 3; i--) {
       const fence = state.tokens[i];
-      if (fence.type !== "fence" || !/^uv run (?:hello|travel)-worker$/.test(fence.content.trim())) continue;
+      if (fence.type !== "fence" || !PLAIN_WORKER.test(fence.content.trim())) continue;
       const [open, inline, close] = state.tokens.slice(i - 3, i);
       if (open.type !== "paragraph_open" || inline.type !== "inline" || close.type !== "paragraph_close") continue;
       // A copy without the g flag: test() on WORKER_PHRASE itself would move its lastIndex.
@@ -643,7 +812,7 @@ export function renderMaster(masterText, solvedIds) {
   return out.join("");
 }
 
-const SNIPPET_FILES = { python: ".py", dogwood: ".dw" };
+const SNIPPET_FILES = { python: ".py", typescript: ".ts", java: ".java", csharp: ".cs", dogwood: ".dw" };
 
 // How a snippet goes into its file: "todo" replaces the TODO block (it's the solution);
 // "replace" swaps a Dogwood rule the file already has (same @id) for the snippet; "append"
@@ -769,7 +938,15 @@ export function loadQuests() {
     if (!fs.existsSync(path.join(repoRoot, branchFile))) continue;
     const { meta, body } = parseFrontmatter(read(branchFile));
     if (meta.id !== dir) throw new Error(`${branchFile}: its id is ${meta.id}, but its folder is ${dir}`);
-    const branch = { ...meta, personas: meta.personas ?? ["developer"], layout: meta.layout ?? "code", description: body.trim(), modules: [] };
+    const branch = {
+      ...meta,
+      personas: meta.personas ?? ["developer"],
+      layout: meta.layout ?? "code",
+      languages: meta.languages ?? ["python"],
+      description: body.trim(),
+      modules: [],
+    };
+    checkBranchLanguages(branchFile, branch);
     for (const id of branch.personas) {
       if (!personas.some((p) => p.id === id)) throw new Error(`${branchFile}: persona ${id} isn't one of ${personas.map((p) => p.id).join(", ")} (quests/personas.yaml)`);
     }
@@ -779,6 +956,7 @@ export function loadQuests() {
     for (const moduleDir of subdirs(`${QUESTS}/${dir}`)) {
       const challenge = loadChallenge(`${QUESTS}/${dir}/${moduleDir}`, dir);
       if (challenge) {
+        if (branch.languages.length > 1) throw new Error(`${challenge.source}: challenges don't have languages yet (.scratch/multi-language ticket 07), and ${dir} has ${branch.languages.join(", ")}`);
         if (modules.has(challenge.id)) throw new Error(`${challenge.source}: id ${challenge.id} is also ${modules.get(challenge.id).source}'s`);
         modules.set(challenge.id, challenge);
         branch.modules.push(challenge.id);
@@ -792,6 +970,8 @@ export function loadQuests() {
       }
       if (modules.has(m.id)) throw new Error(`${source}: module id ${m.id} is also ${modules.get(m.id).source}'s`);
       checkModuleCheck(source, m.check, branch.layout);
+      checkModuleLanguages(source, m, branch.languages);
+      checkLanguageText(source, text, branch.languages);
       modules.set(m.id, {
         ...m,
         branch: dir,
@@ -1117,8 +1297,9 @@ function moduleBeats(module, first) {
 
 // A path's exercise, as the site shows it until it shows the map: its modules' text, one after
 // the other, and their files, tour and questions together.
-function buildExercise(md, quests, ex, number) {
-  const mods = ex.modules.map((id) => quests.modules.get(id));
+function buildExercise(md, quests, ex, number, lang) {
+  const branchOf = (m) => quests.branches.find((b) => b.id === m.branch);
+  const mods = ex.modules.map((id) => quests.modules.get(id)).map((m) => moduleIn(m, lang, branchOf(m)));
   const where = `${quests.paths.find((p) => p.exercises?.includes(ex)).source}: exercise ${ex.id}`;
   const beats = new Map(mods.map((m, i) => [m.id, moduleBeats(m, i === 0)]));
   // A challenge is a beat of its own, after the module it follows (before that module's check).
@@ -1245,6 +1426,31 @@ function buildExercise(md, quests, ex, number) {
       }),
     ),
   };
+}
+
+// The languages an exercise comes in: those all of its modules' branches have, in its first
+// module's branch's order.
+function exerciseLanguages(quests, ex) {
+  const branchOf = (id) => quests.branches.find((b) => b.id === quests.modules.get(id).branch);
+  const [first, ...rest] = ex.modules.map(branchOf);
+  const languages = first.languages.filter((l) => rest.every((b) => b.languages.includes(l)));
+  if (!languages.length) throw new Error(`exercise ${ex.id}: its modules' branches have no language in common`);
+  return languages;
+}
+
+// An exercise as the site gets it: built in its first language, and what differs in each of
+// the others (`byLang`), when it has more than one.
+function exerciseData(md, quests, ex, number) {
+  const languages = exerciseLanguages(quests, ex);
+  const base = buildExercise(md, quests, ex, number, languages[0]);
+  if (languages.length === 1) return { ...base, languages };
+  const byLang = Object.fromEntries(
+    languages.slice(1).map((lang) => {
+      const { worker, files, tour, tourAfter, questions, modes } = buildExercise(md, quests, ex, number, lang);
+      return [lang, { worker, files, tour, tourAfter, questions, modes }];
+    }),
+  );
+  return { ...base, languages, byLang };
 }
 
 // A branch with `maxWords` (Essentials: 100, Fundamentals: 150) keeps each of the guide's
@@ -1383,6 +1589,7 @@ function assembleCourse() {
   knownFiles.clear();
   collectFiles();
   const quests = loadQuests();
+  useCommands(questCommands(quests.branches, quests.modules));
   const exercises = quests.paths.flatMap((p) => p.exercises ?? []);
   moduleExercise.clear();
   for (const ex of exercises) for (const id of withChallenges(ex.modules, quests.modules)) moduleExercise.set(quests.modules.get(id).source, ex.id);
@@ -1392,7 +1599,7 @@ function assembleCourse() {
     title: readme.title,
     home: { intro: readme.intro, architecture: readme.architecture },
     setup: { html: readme.setup },
-    exercises: exercises.map((ex, i) => buildExercise(md, quests, ex, i + 1)),
+    exercises: exercises.map((ex, i) => exerciseData(md, quests, ex, i + 1)),
     branches: quests.branches.map(({ modules, ...branch }) => ({ ...branch, modules })),
     modules: [...quests.modules.values()].map((m) => ({
       id: m.id,
@@ -1460,7 +1667,11 @@ export function contentInputs() {
     }
   };
   for (const dir of [QUESTS, "starter", "authoring"]) if (fs.existsSync(path.join(repoRoot, dir))) walk(dir);
-  for (const module of loadQuests().modules.values()) for (const file of module.files) inputs.push(file.path);
+  for (const module of loadQuests().modules.values()) {
+    for (const files of [module.files, ...Object.values(module.langs ?? {}).map((given) => given.files ?? [])]) {
+      for (const file of files) inputs.push(file.path);
+    }
+  }
   return [...new Set(inputs)].map((rel) => path.join(repoRoot, rel));
 }
 

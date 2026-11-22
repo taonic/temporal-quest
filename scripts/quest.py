@@ -8,6 +8,8 @@
     ./quest status        which TODOs are open, solved, or edited by you
     ./quest starter       every TODO open: the workshop as learners start it
     ./quest solution      every TODO solved: the finished workshop
+    ./quest lang          the language you're doing the modules in (python, unless you chose)
+    ./quest lang java     do them in Java from now on: python, typescript, java or dotnet
 
 A target is a module id (A4) or an exercise id (02-durable-session: all of its modules).
 
@@ -17,8 +19,12 @@ A target is a module id (A4) or an exercise id (02-durable-session: all of its m
 Nothing here depends on having done the earlier modules: entering one solves what it builds on,
 wherever its TODO is still open. A TODO you finished your own way stays yours. Any file of yours
 that has to change is copied to .learner-backup/<timestamp>/ first.
+
+Each command works on the modules' code in your language (./quest lang), or in Python for a
+module whose branch doesn't come in it; starter and solution, on every language's.
 """
 
+import os
 import shutil
 import subprocess
 import sys
@@ -28,13 +34,26 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from render import AUTHORING, blocks, masters, render, todo_modules  # noqa: E402
 
-from quests import ROOT, Module, closure, modules, resolve  # noqa: E402
+from quests import LANGUAGES, ROOT, Module, closure, language_of, modules, resolve  # noqa: E402
 
 COURSE = ROOT / ".course"
+CODE_SUFFIXES = {".py", ".ts", ".java", ".cs"}
 OPEN, SOLVED, STARTED, OWN = "open", "solved", "started", "yours"
 
 
 # --- The TODOs in the learner's files ---------------------------------------------------------
+
+
+def current_language() -> str:
+    """The language the learner does the modules in (./quest lang): Python until they choose."""
+    path = COURSE / "lang"
+    language = path.read_text().strip() if path.exists() else ""
+    return language if language in LANGUAGES else "python"
+
+
+def in_language(module_id: str, master: Path, language: str | None) -> bool:
+    """Whether a master is the module's code in the learner's language (None: in any)."""
+    return language is None or language_of(master, AUTHORING) == modules()[module_id].language(language)
 
 
 def learner_file(master: Path) -> Path:
@@ -77,17 +96,25 @@ class Changes:
         shutil.copy2(path, dest)
 
 
-def apply(want: dict[str, str], changes: Changes, *, keep_own: bool, out=sys.stdout) -> None:
-    """Puts each module's TODOs in the state wanted (OPEN or SOLVED), file by file.
+def apply(want: dict[str, str], changes: Changes, *, keep_own: bool, out=sys.stdout, language: str | None = "") -> None:
+    """Puts each module's TODOs in the state wanted (OPEN or SOLVED), file by file: in the files of
+    ``language`` (the learner's by default; None: every language's).
 
     An open TODO becomes the solution (or back), in place, so the rest of the file is left as it
     is. A TODO you started is saved and replaced. With ``keep_own``, a TODO you finished your own
     way stays; without, it's saved and replaced too.
     """
+    if language == "":
+        language = current_language()
     for master in masters():
         current = states(master)
         todo = {
-            m: s for m, s in want.items() if m in current and current[m] != s and not (keep_own and current[m] == OWN)
+            m: s
+            for m, s in want.items()
+            if m in current
+            and current[m] != s
+            and not (keep_own and current[m] == OWN)
+            and in_language(m, master, language)
         }
         if not todo:
             continue
@@ -144,8 +171,9 @@ def after_changes(changes: Changes, targets: list[Module]) -> None:
     if any(path.suffix == ".dw" for path in changes.files):
         # The verifier reads the policy when it starts.
         run("uv run --frozen travel-stack restart verifier")
-    if any(path.suffix == ".py" for path in changes.files):
-        workers = {m.worker for m in targets if m.worker} or {"uv run travel-worker"}
+    if any(path.suffix in CODE_SUFFIXES for path in changes.files):
+        language = current_language()
+        workers = {w for m in targets if (w := m.worker_in(m.language(language)))} or {"uv run travel-worker"}
         print(f"Restart your worker (Ctrl-C, then: {' or '.join(sorted(workers))}) to load the new code.")
 
 
@@ -217,9 +245,13 @@ def cmd_check(targets, exercise) -> None:
         if needs and not (ROOT / needs["file"]).exists():
             sys.exit(f"✗ {needs['hint']}")
     tests = [t for m in checked for t in m.check["tests"]]
+    # The checks run the learner's code in their language (tests/langs.py reads QUEST_LANG).
+    language = checked[0].language(current_language())
+    env = os.environ if language == "python" else {**os.environ, "QUEST_LANG": language}
     result = subprocess.run(
         [sys.executable, "-m", "pytest", "-q", "-x", "-p", "no:cacheprovider", *tests],
         cwd=ROOT,
+        env=env,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
@@ -228,7 +260,7 @@ def cmd_check(targets, exercise) -> None:
     if result.returncode != 0:
         failed = [line.split()[1] for line in result.stdout.splitlines() if line.startswith(("FAILED ", "ERROR "))]
         culprit = next((m for m in checked for t in m.check["tests"] for f in failed if covers(t, f)), checked[0])
-        sys.exit(f"✗ {culprit.check.get('hint', 'Not there yet.')}")
+        sys.exit(f"✗ {culprit.hint_in(language)}")
     passed = COURSE / "passed"
     passed.mkdir(parents=True, exist_ok=True)
     for name in [m.id for m in checked] + ([exercise.id] if exercise and len(targets) > 1 else []):
@@ -243,9 +275,11 @@ def covers(test: str, failed: str) -> bool:
 
 def cmd_status() -> None:
     found = {}
+    language = current_language()
     for master in masters():
         for m, s in states(master).items():
-            found.setdefault(m, set()).add(s)
+            if in_language(m, master, language):
+                found.setdefault(m, set()).add(s)
     for id_ in modules():
         if id_ in found:
             s = found[id_]
@@ -255,11 +289,23 @@ def cmd_status() -> None:
 def cmd_all(state: str) -> None:
     changes = Changes()
     want = {id_: state for id_ in todo_modules()}
-    apply(want, changes, keep_own=False)
+    apply(want, changes, keep_own=False, language=None)
     what = "open: the workshop as learners start it" if state == OPEN else "solved: the finished workshop"
     print(f"Every TODO is {what}.")
     if changes.files:
         print("Restart your workers to load the new code.")
+
+
+def cmd_lang(args: list[str]) -> None:
+    if not args:
+        print(current_language())
+        return
+    if args[0] not in LANGUAGES:
+        sys.exit(f"No language called {args[0]!r}: {', '.join(LANGUAGES)}")
+    COURSE.mkdir(exist_ok=True)
+    (COURSE / "lang").write_text(args[0] + "\n")
+    fallback = "" if args[0] == "python" else " (in Python, where a branch doesn't come in it)"
+    print(f"Doing the modules in {args[0]} from now on{fallback}.")
 
 
 COMMANDS = {"enter": cmd_enter, "check": cmd_check, "solve": cmd_solve, "reset": cmd_reset, "catch-up": cmd_catch_up}
@@ -271,6 +317,8 @@ def main() -> None:
         return cmd_status()
     if args in (["starter"], ["solution"]):
         return cmd_all(OPEN if args[0] == "starter" else SOLVED)
+    if args[:1] == ["lang"] and len(args) <= 2:
+        return cmd_lang(args[1:])
     if len(args) >= 3 and args[0] == "challenge":
         # The browser's, in a sandbox's terminal: run one choice of a challenge, and show it.
         # --run ID tags the run's JSON lines; --json prints them instead (record_challenges.py).

@@ -476,3 +476,81 @@ test("concepts: each module's are in quests/concepts.yaml, and its code can't us
   assert.deepEqual(course.concepts.find((c) => c.id === "update").modules, ["F9", "F14"]);
   assert.deepEqual(course.concepts.find((c) => c.id === "signal").modules, [], "not in the course yet");
 });
+
+// --- Languages (ADR 0001) ---
+
+const TWO = ["python", "typescript"];
+const SNIPPETS = [
+  "Call the activity:",
+  "",
+  "```python",
+  "await workflow.execute_activity(lookup_airport, code)",
+  "```",
+  "",
+  "```typescript",
+  "await lookup_airport(code);",
+  "```",
+  "",
+  "<!-- lang python -->",
+  "- `start_to_close_timeout`: how long one attempt may take.",
+  "<!-- /lang -->",
+  "<!-- lang typescript -->",
+  "- `startToCloseTimeout`: how long one attempt may take.",
+  "<!-- /lang -->",
+  "Then restart the worker.",
+  "",
+].join("\n");
+
+test("a module's text in each language: its own language blocks, and its own version of each snippet", async () => {
+  const { applyLanguage } = await import("../content/build.mjs");
+  const python = applyLanguage(SNIPPETS, "python", TWO);
+  assert.match(python, /execute_activity/);
+  assert.doesNotMatch(python, /await lookup_airport\(code\);|startToCloseTimeout|<!--/);
+  assert.match(python, /- `start_to_close_timeout`/);
+  const ts = applyLanguage(SNIPPETS, "typescript", TWO);
+  assert.match(ts, /await lookup_airport\(code\);/);
+  assert.doesNotMatch(ts, /execute_activity|start_to_close_timeout|<!--/);
+  assert.equal(ts, "Call the activity:\n\n```typescript\nawait lookup_airport(code);\n```\n\n- `startToCloseTimeout`: how long one attempt may take.\nThen restart the worker.\n");
+  // A branch with one language: two snippets in a row are two snippets.
+  const one = "```python\na = 1\n```\n\n```python\nb = 2\n```\n";
+  assert.equal(applyLanguage(one, "python", ["python"]), one);
+});
+
+test("the build fails on a snippet without a version in each of its branch's languages", async () => {
+  const { checkLanguageText } = await import("../content/build.mjs");
+  assert.doesNotThrow(() => checkLanguageText("m.md", SNIPPETS, TWO));
+  const missing = SNIPPETS.replace("```typescript\nawait lookup_airport(code);\n```\n", "");
+  assert.throws(() => checkLanguageText("m.md", missing, TWO), /line 3 of its text has no typescript version/);
+  assert.throws(() => checkLanguageText("m.md", SNIPPETS, ["python", "typescript", "java"]), /no java version/);
+  assert.throws(() => checkLanguageText("m.md", "```python\na\n```\n\n```python\nb\n```\n", TWO), /two python versions/);
+  // A one-language snippet is fine inside its language's block, and only there.
+  assert.doesNotThrow(() => checkLanguageText("m.md", "<!-- lang python -->\n```python\na\n```\n<!-- /lang -->\n", TWO));
+  assert.throws(() => checkLanguageText("m.md", "<!-- lang python -->\n```typescript\na\n```\n<!-- /lang -->\n", TWO), /typescript code block inside <!-- lang python -->/);
+  assert.throws(() => checkLanguageText("m.md", "```typescript\na\n```\n", ["python"]), /isn't one of its branch's languages/);
+  assert.throws(() => checkLanguageText("m.md", "<!-- lang java -->\nx\n<!-- /lang -->\n", TWO), /lang java --> isn't one of its branch's languages/);
+  assert.throws(() => checkLanguageText("m.md", "<!-- lang python -->\n## 2. A step\n<!-- /lang -->\n", TWO), /a heading inside/);
+  assert.throws(() => checkLanguageText("m.md", "<!-- lang python -->\nnever closed\n", TWO), /isn't closed/);
+});
+
+test("a branch's languages, and what a module gives each one, are checked", async () => {
+  const { checkBranchLanguages, checkModuleLanguages } = await import("../content/build.mjs");
+  const branch = { languages: TWO, worker: "uv run hello-worker", starter: "uv run hello-start", langs: { typescript: { worker: "npm run worker", starter: "npm run start --" } } };
+  assert.doesNotThrow(() => checkBranchLanguages("b.md", branch));
+  assert.throws(() => checkBranchLanguages("b.md", { ...branch, languages: ["python", "rust"] }), /rust isn't one of/);
+  assert.throws(() => checkBranchLanguages("b.md", { ...branch, langs: { typescript: { worker: "npm run worker" } } }), /no langs.typescript.starter/);
+  assert.throws(() => checkBranchLanguages("b.md", { ...branch, langs: { ...branch.langs, python: { worker: "x" } } }), /langs.python, but python isn't one of its other languages/);
+  const module = { files: [{ path: "hello/workflow.py" }], tour: [{ file: "hello/workflow.py" }], check: { kind: "code" } };
+  const given = { files: [{ path: "langs/typescript/hello/src/workflows.ts" }], tour: [{}], hint: "Look in workflows.ts." };
+  assert.doesNotThrow(() => checkModuleLanguages("m.md", { ...module, langs: { typescript: given } }, TWO));
+  assert.doesNotThrow(() => checkModuleLanguages("m.md", module, ["python"]));
+  assert.throws(() => checkModuleLanguages("m.md", module, TWO), /no langs.typescript.files/);
+  assert.throws(() => checkModuleLanguages("m.md", { ...module, langs: { typescript: { ...given, hint: undefined } } }, TWO), /no langs.typescript.hint/);
+  assert.throws(() => checkModuleLanguages("m.md", { ...module, langs: { typescript: { ...given, title: "x" } } }, TWO), /langs.typescript.title isn't one of/);
+});
+
+test("every branch has its languages, Python where it names none, and every exercise its own", () => {
+  const course = buildCourse();
+  for (const branch of course.branches) assert.ok(branch.languages?.length, `${branch.id} has no languages`);
+  assert.deepEqual(course.branches.find((b) => b.id === "fundamentals").languages, ["python"]);
+  for (const exercise of course.exercises) assert.deepEqual(exercise.languages, ["python"], exercise.id);
+});

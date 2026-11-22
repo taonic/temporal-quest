@@ -4,7 +4,12 @@
     quests/<branch>/<NN-slug>/module.md     a module: its id, what it requires, its check
     quests/paths/<path>.yaml                a path: an ordered run of modules (a live event)
 
-The course site reads the same files (course/content/build.mjs).
+The course site reads the same files (course/content/build.mjs), and checks them more closely.
+
+A branch comes in each of its `languages` (Python when it lists none), the first its default: a
+module's frontmatter is that language's, and its `langs:` gives what differs in each other one.
+Code for a language other than Python lives under langs/<language>/ (its masters under
+authoring/langs/<language>/). docs/adr/0001-one-module-several-languages.md
 """
 
 import re
@@ -16,6 +21,13 @@ import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 QUESTS = ROOT / "quests"
+LANGUAGES = ("python", "typescript", "java", "dotnet")
+
+
+def language_of(path: Path, base: Path = ROOT) -> str:
+    """The language a file of code is in: langs/<language>/… is that language's, anything else Python's."""
+    parts = path.relative_to(base).parts
+    return parts[1] if len(parts) > 2 and parts[0] == "langs" else "python"
 
 
 @dataclass(frozen=True)
@@ -29,10 +41,29 @@ class Module:
     check: dict = field(default_factory=dict, hash=False, compare=False)
     savepoint: dict = field(default_factory=dict, hash=False, compare=False)
     worker: str | None = None
+    languages: tuple[str, ...] = ("python",)
+    langs: dict = field(default_factory=dict, hash=False, compare=False)
+    branch_langs: dict = field(default_factory=dict, hash=False, compare=False)
 
     @property
     def ready(self) -> bool:
         return self.status != "coming-soon"
+
+    def language(self, wanted: str) -> str:
+        """The language a learner who builds in ``wanted`` does this module in: that one, if its
+        branch has it, and otherwise its branch's first."""
+        return wanted if wanted in self.languages else self.languages[0]
+
+    def worker_in(self, language: str) -> str | None:
+        """Its worker command in one of its languages."""
+        if language == self.languages[0]:
+            return self.worker
+        return (self.langs.get(language) or {}).get("worker") or (self.branch_langs.get(language) or {}).get("worker")
+
+    def hint_in(self, language: str) -> str:
+        """Its check's hint in one of its languages."""
+        given = (self.langs.get(language) or {}).get("hint") if language != self.languages[0] else None
+        return given or self.check.get("hint", "Not there yet.")
 
 
 @dataclass(frozen=True)
@@ -54,6 +85,10 @@ def branches() -> dict[str, dict]:
     found = {}
     for path in sorted(QUESTS.glob("*/branch.md")):
         meta = frontmatter(path)
+        meta.setdefault("languages", ["python"])
+        for language in meta["languages"]:
+            if language not in LANGUAGES:
+                raise ValueError(f"{path}: language {language} isn't one of {', '.join(LANGUAGES)}")
         found[path.parent.name] = meta
     return dict(sorted(found.items(), key=lambda kv: kv[1].get("order", 99)))
 
@@ -75,6 +110,9 @@ def modules() -> dict[str, Module]:
                 check=m.get("check") or {"kind": "pending"},
                 savepoint=m.get("savepoint") or {},
                 worker=m.get("worker", meta.get("worker")),
+                languages=tuple(meta["languages"]),
+                langs=m.get("langs") or {},
+                branch_langs=meta.get("langs") or {},
             )
             if module.id in found:
                 raise ValueError(f"{path}: module id {module.id} is also {found[module.id].dir}")

@@ -7,6 +7,8 @@ color: green
 order: 1
 classTitle: Durable Apprentice
 worker: uv run hello-worker
+starter: uv run hello-start
+languages: [python]
 agentUi: false
 maxWords: 150
 tiers:
