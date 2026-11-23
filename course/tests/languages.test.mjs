@@ -90,13 +90,15 @@ const MODULES = [
   { id: "F2", kind: "module", check: "code", status: "ready", branch: "fundamentals", tier: 1 },
 ];
 
-test("Polyglot: the same module with a code check, passed in two languages", () => {
+test("Polyglot: the same module's code check, passed in two languages", () => {
   const ctx = badgeContext(MODULES, () => null);
   const badge = { kind: "skill", rule: "polyglot" };
-  assert.equal(meets(badge, ctx, { completed: ["F2"], passedIn: { F2: ["python"] } }), false);
-  assert.equal(meets(badge, ctx, { completed: ["F2"], passedIn: { F2: ["python", "typescript"] } }), true);
+  assert.equal(meets(badge, ctx, { completed: ["F2"], checkedIn: { F2: ["python"] } }), false);
+  assert.equal(meets(badge, ctx, { completed: ["F2"], checkedIn: { F2: ["python", "typescript"] } }), true);
+  // Moved on past in two languages, its check passed in one: not two languages' code.
+  assert.equal(meets(badge, ctx, { completed: ["F2"], passedIn: { F2: ["python", "typescript"] }, checkedIn: { F2: ["python"] } }), false);
   // F1 has no code to write: passing it twice isn't two languages' code.
-  assert.equal(meets(badge, ctx, { completed: ["F1"], passedIn: { F1: ["python", "typescript"] } }), false);
+  assert.equal(meets(badge, ctx, { completed: ["F1"], checkedIn: { F1: ["python", "typescript"] } }), false);
 });
 
 const CATALOG = catalogOf({
@@ -108,17 +110,22 @@ const CATALOG = catalogOf({
   badges: [{ id: "polyglot", kind: "skill", rule: "polyglot" }],
 });
 
-test("the server keeps the learner's language, each module's languages, and earns Polyglot from them", () => {
+test("the server keeps the learner's language, each module's languages, and earns Polyglot from its checks", () => {
   const events = [
     { type: "module_passed", module_id: "F2", data: null, at: 1 },
-    { type: "language_set", data: { language: "typescript" }, at: 2 },
-    { type: "module_passed", module_id: "F2", data: { lang: "typescript" }, at: 3 },
+    { type: "check_passed", module_id: "F2", data: null, at: 2 },
+    { type: "language_set", data: { language: "typescript" }, at: 3 },
+    { type: "module_passed", module_id: "F2", data: { lang: "typescript" }, at: 4 },
   ];
   const progress = deriveProgress(events, CATALOG);
   assert.equal(progress.language, "typescript");
   assert.deepEqual(progress.completed, ["F2"]);
   assert.deepEqual(progress.passedIn, { F2: ["python", "typescript"] });
-  assert.deepEqual(progress.badges, [{ id: "polyglot", at: 3 }]);
+  assert.deepEqual(progress.checkedIn, { F2: ["python"] });
+  assert.deepEqual(progress.badges, [], "TypeScript's check hasn't passed");
+  const checked = deriveProgress([...events, { type: "check_passed", module_id: "F2", data: { lang: "typescript" }, at: 5 }], CATALOG);
+  assert.deepEqual(checked.checkedIn, { F2: ["python", "typescript"] });
+  assert.deepEqual(checked.badges, [{ id: "polyglot", at: 5 }]);
 });
 
 test("a language the course doesn't offer isn't recorded; the cohort's language is the default", () => {

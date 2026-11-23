@@ -9,7 +9,7 @@ import { computed, nextTick, ref, watch } from "vue";
 import BadgeMedal from "./BadgeMedal.vue";
 import NodeTrail from "./NodeTrail.vue";
 import { course } from "../store.js";
-import { badges, branchesById, isDone, isEarned, isPlayable, mapOrder, modulesById, opensAfter, recommended, routeTo, trunk, trunkTail } from "../progress.js";
+import { badgeMissing, badgeUnchecked, badges, branchesById, isDone, isEarned, isPlayable, mapOrder, modulesById, opensAfter, recommended, routeTo, trunk, trunkTail } from "../progress.js";
 
 const props = defineProps({ selected: { type: String, default: null } });
 const emit = defineEmits(["select", "expand", "branch"]);
@@ -107,6 +107,8 @@ async function toggle(b) {
 const roman = (n) => ["", "I", "II", "III", "IV", "V"][n] ?? String(n);
 // The badge the tier on show earns, if it has one.
 const shownBadge = computed(() => badges.find((b) => b.kind === "tier" && b.branch === shown.value.branch.id && b.tier === shown.value.n) ?? null);
+// Every module in the tier done, and only a code check left before its badge.
+const shownUnchecked = computed(() => Boolean(shownBadge.value && !badgeMissing(shownBadge.value).length && badgeUnchecked(shownBadge.value).length));
 </script>
 
 <template>
@@ -121,6 +123,7 @@ const shownBadge = computed(() => badges.find((b) => b.kind === "tier" && b.bran
       <a v-if="shownBadge" class="focus-reward" href="#/badges" :data-badge="shownBadge.id">
         <BadgeMedal :badge="shownBadge" :earned="isEarned(shownBadge.id)" :size="44" />
         <span v-if="isEarned(shownBadge.id)">Earned <strong>{{ shownBadge.name }}</strong></span>
+        <span v-else-if="shownUnchecked">Pass your check to earn <strong>{{ shownBadge.name }}</strong></span>
         <span v-else>Finish this tier to earn <strong>{{ shownBadge.name }}</strong></span>
       </a>
     </header>

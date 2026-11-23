@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { ICON_NAMES, medalSvg } from "../web/src/badgeArt.js";
-import { badgeContext, earnedNow, isComingSoon, meets, missingFor } from "../web/src/badges.js";
+import { badgeContext, earnedNow, isComingSoon, meets, missingFor, uncheckedFor } from "../web/src/badges.js";
 import { CLASS_TITLE_MAX, idList, loadBadges, loadQuests } from "../content/build.mjs";
 import { Activity, catalogOf, deriveProgress } from "../runner/activity.mjs";
 import { openDatabase } from "../runner/db.mjs";
@@ -77,6 +77,34 @@ test("Flawless: a boss won with every heart left", () => {
 test("Explorer: a module passed in every branch that has one ready", () => {
   assert.equal(meets(badge("explorer"), ctx, state({ completed: ["F1"] })), false);
   assert.equal(meets(badge("explorer"), ctx, state({ completed: ["F1", "A1"] })), true, "Payments has nothing ready yet");
+});
+
+test("moving on past a module with a code check doesn't earn its badges: its check passing does", () => {
+  const coded = badgeContext(MODULES.map((m) => (m.id === "F2" || m.id === "A1" ? { ...m, check: "code" } : m)), (id) => RIGHT[id] ?? null);
+  const all = ["F1", "F2", "FC1"];
+  assert.equal(meets(badge("fundamentals-1"), coded, state({ completed: all })), false);
+  assert.deepEqual(uncheckedFor(badge("fundamentals-1"), coded, all, {}), ["F2"]);
+  assert.equal(meets(badge("fundamentals-1"), coded, state({ completed: all, checkedIn: { F2: ["python"] } })), true);
+  assert.deepEqual(uncheckedFor(badge("fundamentals-1"), coded, all, { F2: ["python"] }), []);
+  // In any language.
+  assert.equal(meets(badge("fundamentals-1"), coded, state({ completed: all, checkedIn: { F2: ["java"] } })), true);
+  // A check that passed for a module not done yet waits for it.
+  assert.equal(meets(badge("fundamentals-1"), coded, state({ completed: ["F1", "FC1"], checkedIn: { F2: ["python"] } })), false);
+  // The same for a milestone, No Peeking and Explorer.
+  assert.equal(meets(badge("cross-team"), coded, state({ completed: ["A1"] })), false);
+  assert.equal(meets(badge("cross-team"), coded, state({ completed: ["A1"], checkedIn: { A1: ["python"] } })), true);
+  assert.equal(meets(badge("no-peeking"), coded, state({ completed: all })), false);
+  assert.equal(meets(badge("explorer"), coded, state({ completed: ["F2", "A1"] })), false);
+  assert.equal(meets(badge("explorer"), coded, state({ completed: ["F1", "A1"], checkedIn: { A1: ["python"] } })), true);
+});
+
+test("the server earns a code module's badge at its check_passed, not its module_passed", () => {
+  const catalog = catalogOf({ modules: MODULES.map((m) => (m.id === "A1" ? { ...m, check: "code" } : m)), exercises: [], paths: [], badges: BADGES });
+  const passed = [{ type: "module_passed", module_id: "A1", at: 100 }];
+  assert.deepEqual(deriveProgress(passed, catalog).badges, []);
+  const progress = deriveProgress([...passed, { type: "check_passed", module_id: "A1", at: 200 }], catalog);
+  assert.deepEqual(progress.checkedIn, { A1: ["python"] });
+  assert.deepEqual(progress.badges.map((b) => [b.id, b.at]), [["no-peeking", 200], ["cross-team", 200]]);
 });
 
 test("criteria lines: runs of three or more as a range, the rest one by one", () => {

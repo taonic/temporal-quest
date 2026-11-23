@@ -9,9 +9,11 @@
 //
 // Badges (badges.js) are kept once earned: { id: when }, from the server and from what this page
 // sees the learner earn. Earning one here sets lastBadges, for the earn moment (EarnMoment.vue).
+// Moving on past a module gives its XP, but a module with a code check counts towards a badge
+// only once that check passed (checkedIn, from the sandbox's poll: recordChecks).
 import { computed, reactive, watch } from "vue";
 
-import { badgeContext, earnedNow, isComingSoon, missingFor as badgeMissingFor } from "./badges.js";
+import { badgeContext, earnedNow, isComingSoon, missingFor as badgeMissingFor, uncheckedFor } from "./badges.js";
 import { addPick, xpFor } from "./challenge.js";
 import { QUESTION_XP, quizXp } from "./race/rules.js";
 import { settleChoice } from "./choices.js";
@@ -91,6 +93,8 @@ export const progress = reactive({
   bossResults: load("boss-results", []),
   // Each module's languages it was passed in: { F2: ["python", "typescript"] } (Polyglot).
   passedIn: load("passed-in", {}),
+  // Each module's languages its code check passed in: { F2: ["python"] } (badges, Polyglot).
+  checkedIn: load("checked-in", {}),
 });
 
 watch(() => progress.completed, (ids) => save("modules", ids), { deep: true });
@@ -100,6 +104,7 @@ watch(() => progress.attempts, (picks) => save("attempts", picks), { deep: true 
 watch(() => progress.path, (id) => save("path", id));
 watch(() => progress.bossResults, (results) => save("boss-results", results), { deep: true });
 watch(() => progress.passedIn, (passed) => save("passed-in", passed), { deep: true });
+watch(() => progress.checkedIn, (checked) => save("checked-in", checked), { deep: true });
 
 // --- The server's copy ------------------------------------------------------------------------
 
@@ -147,6 +152,11 @@ async function syncFromServer() {
       const lang = (progress.passedIn[id] ?? []).find((l) => l !== "python");
       track("module_passed", id, lang ? { lang } : null);
     }
+    // Checks passed here that the server doesn't have (this learner's, or before their first sign-in).
+    const checked = owner && !mine ? {} : { ...progress.checkedIn };
+    for (const [id, langs] of Object.entries(checked)) {
+      for (const lang of langs) if (!(server.checkedIn?.[id] ?? []).includes(lang)) track("check_passed", id, lang === "python" ? null : { lang });
+    }
     syncing = true;
     progress.completed = [...server.completed, ...unsent].filter((id) => anyModuleById.has(id));
     progress.attempts = mine ? { ...progress.attempts, ...server.attempts } : server.attempts;
@@ -171,6 +181,8 @@ async function syncFromServer() {
     const passed = { ...(mine ? progress.passedIn : {}) };
     for (const [id, langs] of Object.entries(server.passedIn ?? {})) passed[id] = [...new Set([...(passed[id] ?? []), ...langs])];
     progress.passedIn = passed;
+    for (const [id, langs] of Object.entries(server.checkedIn ?? {})) checked[id] = [...new Set([...(checked[id] ?? []), ...langs])];
+    progress.checkedIn = checked;
   } catch {
     /* the page keeps this browser's progress */
   } finally {
@@ -230,7 +242,7 @@ const badgeState = () => ({
   attempts: progress.attempts,
   solutionUsed: progress.solutionUsed,
   bossResults: progress.bossResults,
-  passedIn: progress.passedIn,
+  checkedIn: progress.checkedIn,
 });
 // The badges the learner meets now. Any not kept yet are kept, quietly (what the server sent, or
 // a sign-in's progress): only one earned on this page gets an earn moment (complete, below).
@@ -248,6 +260,8 @@ export const earnedCount = computed(() => badges.filter((b) => isEarned(b.id)).l
 // What an earned badge's tier has gained since (it's kept): the modules not done.
 export const badgeMissing = (badge) => badgeMissingFor(badge, badgeCtx, progress.completed);
 export const badgeComingSoon = (badge) => isComingSoon(badge, badgeCtx);
+// What a badge still waits on once its modules are done: the code checks not passed yet.
+export const badgeUnchecked = (badge) => uncheckedFor(badge, badgeCtx, progress.completed, progress.checkedIn);
 
 // The class title: the boss badge earned last. "Initiate" before any.
 export const titleBadge = computed(() =>
@@ -368,6 +382,22 @@ export function complete(id) {
   progress.lastGain = { id, amount: xpOf(id), levelUp: level.value > before ? level.value : null, at: Date.now() };
   track("module_passed", id, data);
   earnMoment();
+}
+
+// The checks the sandbox says passed (.course/passed: modules and exercises): each module's code
+// check is kept, in the language it passed in, and recorded; a badge it was waiting on comes now.
+export function recordChecks(ids) {
+  let fresh = false;
+  for (const id of ids ?? []) {
+    const m = anyModuleById.get(id);
+    if (m?.check !== "code") continue;
+    const lang = moduleLanguage(m, store.language.id);
+    if ((progress.checkedIn[id] ?? []).includes(lang)) continue;
+    progress.checkedIn = { ...progress.checkedIn, [id]: [...(progress.checkedIn[id] ?? []), lang] };
+    track("check_passed", id, lang === "python" ? null : { lang });
+    fresh = true;
+  }
+  if (fresh) earnMoment();
 }
 
 // The badges just earned, kept, with their earn moment.

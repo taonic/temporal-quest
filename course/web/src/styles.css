@@ -7657,6 +7657,12 @@ a.menu-item {
   color: var(--faint);
 }
 
+.badge-card-unchecked {
+  margin: 4px 0 0;
+  color: var(--amber);
+  font-size: 10.5px;
+}
+
 .badge-card-grown {
   display: inline-block;
   margin: 5px 0 0;

@@ -68,7 +68,7 @@ Every tier with a `badge` earns one, named there, for passing all its modules an
   criteria: "Pass N5: a workflow calls another team's agent"
 ```
 
-The rules live in `course/web/src/badges.js`. A badge, once earned, is kept: renaming or regrouping a tier doesn't take it away, but changing its `id` (a tier's is `<branch>-<n>`) does. [Issue 09](../.scratch/temporal-quest/issues/09-badges.md) has the design.
+A module with a code check counts towards a badge only once its check has passed (`./quest check`, in any language), not when the learner moves on past it, which still gives its XP. A module without a check of its own yet counts once it's passed, as before. The rules live in `course/web/src/badges.js`. A badge, once earned, is kept: renaming or regrouping a tier doesn't take it away, but changing its `id` (a tier's is `<branch>-<n>`) does. [Issue 09](../.scratch/temporal-quest/issues/09-badges.md) has the design.
 
 ## module.md
 

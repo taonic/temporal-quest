@@ -20,7 +20,7 @@
 
 **Boss**: the scenario quiz that ends a branch. It has 8 HP, and the learner has 3 hearts. Beating it awards the branch's **class title**.
 
-**Badge**: what marks something a learner has done: a **tier badge** for a tier finished, a **boss badge** (the class title) for a boss beaten, or a **skill badge** for how they learned (Clean Run, No Peeking, Flawless, Explorer, Cross-Team). Once earned, it's kept. Badges carry no XP.
+**Badge**: what marks something a learner has done: a **tier badge** for a tier finished, a **boss badge** (the class title) for a boss beaten, or a **skill badge** for how they learned (Clean Run, No Peeking, Flawless, Explorer, Cross-Team). A module with a code check counts towards one only once that check passed. Once earned, it's kept. Badges carry no XP.
 
 **Test-out**: beating a boss before doing its branch's modules, which marks the branch complete.
 

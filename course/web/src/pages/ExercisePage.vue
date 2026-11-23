@@ -15,7 +15,7 @@ import SandboxPanes from "../components/SandboxPanes.vue";
 import TerminalDock from "../components/TerminalDock.vue";
 import TripBoard from "../components/TripBoard.vue";
 import Tour from "../Tour.vue";
-import { markSolutionUsed, moduleOfBeat, modulesById } from "../progress.js";
+import { markSolutionUsed, moduleOfBeat, modulesById, recordChecks } from "../progress.js";
 import {
   api,
   applyAllowance,
@@ -274,6 +274,7 @@ async function poll() {
       if (data.caughtUp?.length) caughtUp(data.caughtUp, data.worker);
       else if (data.worker?.stale) restartStaleWorker();
       if (data.trips) setTrips(data);
+      recordChecks(data.passed);
       const fresh = markPassed(data.passed);
       if (fresh.includes(props.id)) celebrate();
       else if (fresh.length) store.celebrated = [...store.celebrated, ...fresh];

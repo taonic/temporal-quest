@@ -16,9 +16,9 @@ import { badgeContext, earnedNow } from "../web/src/badges.js";
 import { xpFor } from "../web/src/challenge.js";
 import { transaction } from "./db.mjs";
 
-export const BROWSER_EVENTS = new Set(["module_opened", "module_passed", "check_failed", "challenge_pick", "quiz_pick", "boss_result", "path_set", "persona_set", "language_set", "solution_used"]);
+export const BROWSER_EVENTS = new Set(["module_opened", "module_passed", "check_passed", "check_failed", "challenge_pick", "quiz_pick", "boss_result", "path_set", "persona_set", "language_set", "solution_used"]);
 // The events that can change which badges are earned.
-const BADGE_INPUTS = new Set(["module_passed", "challenge_pick", "boss_result", "solution_used"]);
+const BADGE_INPUTS = new Set(["module_passed", "check_passed", "challenge_pick", "boss_result", "solution_used"]);
 // A heartbeat counts for at most this much time on its module (one every 60s, with slack).
 const HEARTBEAT_MAX_SECONDS = 90;
 // Someone on one module this long without passing it, and still there, is stuck.
@@ -78,8 +78,9 @@ export function catalogOf(data) {
 }
 
 // Progress from a learner's events, in order: { completed, attempts, path, persona, language,
-// passedIn, xp, solutionUsed, badges, unrecorded }. passedIn: each module's languages it was passed
-// in (a module_passed's `lang`, Python when it has none), for Polyglot.
+// passedIn, checkedIn, xp, solutionUsed, badges, unrecorded }. passedIn: each module's languages it
+// was passed in (a module_passed's `lang`, Python when it has none). checkedIn: the same for a
+// module's code check (check_passed), which a module with one needs for its badges.
 //
 // badges: [{ id, at }], every badge earned, oldest first: those recorded (badge_earned), and
 // those the events earn, at the event that earned each. A badge counts once its criteria were
@@ -96,12 +97,16 @@ export function deriveProgress(events, catalog) {
   let persona = null;
   let language = null;
   const passedIn = {};
+  const checkedIn = {};
   for (const e of events) {
     const data = typeof e.data === "string" ? JSON.parse(e.data || "{}") : (e.data ?? {});
     if (e.type === "module_passed" && e.module_id) {
       if (!completed.includes(e.module_id)) completed.push(e.module_id);
       const lang = typeof data.lang === "string" ? data.lang : "python";
       if (!(passedIn[e.module_id] ?? []).includes(lang)) passedIn[e.module_id] = [...(passedIn[e.module_id] ?? []), lang];
+    } else if (e.type === "check_passed" && e.module_id) {
+      const lang = typeof data.lang === "string" ? data.lang : "python";
+      if (!(checkedIn[e.module_id] ?? []).includes(lang)) checkedIn[e.module_id] = [...(checkedIn[e.module_id] ?? []), lang];
     } else if (e.type === "challenge_pick" && e.module_id && data.choice) {
       const picks = attempts[e.module_id] ?? [];
       const right = catalog.rightChoice(e.module_id);
@@ -114,7 +119,7 @@ export function deriveProgress(events, catalog) {
     else if (e.type === "boss_result" && e.module_id) bossResults.push({ won: Boolean(data.won), hearts: Number(data.hearts) || 0 });
     else if (e.type === "badge_earned" && data.badge && !recorded.has(data.badge)) recorded.set(data.badge, data.earnedAt ?? e.at);
     if (BADGE_INPUTS.has(e.type) && catalog.badges?.length) {
-      for (const id of earnedNow(catalog.badges, catalog.badgeContext, { completed, attempts, solutionUsed, bossResults, passedIn })) {
+      for (const id of earnedNow(catalog.badges, catalog.badgeContext, { completed, attempts, solutionUsed, bossResults, checkedIn })) {
         if (!derived.has(id)) derived.set(id, e.at ?? null);
       }
     }
@@ -124,7 +129,7 @@ export function deriveProgress(events, catalog) {
   const earned = new Map([...derived, ...recorded].filter(([id]) => !catalog.badgesById || catalog.badgesById.has(id)));
   const badges = [...earned].map(([id, at]) => ({ id, at })).sort((a, b) => (a.at ?? 0) - (b.at ?? 0));
   const unrecorded = badges.filter((b) => !recorded.has(b.id)).map((b) => b.id);
-  return { completed, attempts, path, persona, language, passedIn, xp, solutionUsed, badges, unrecorded };
+  return { completed, attempts, path, persona, language, passedIn, checkedIn, xp, solutionUsed, badges, unrecorded };
 }
 
 export class Activity {

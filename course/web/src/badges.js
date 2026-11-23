@@ -9,6 +9,11 @@
 // Only modules that are ready count: a tier whose modules are all coming soon can't be earned
 // yet, and a module that ships into an earned tier doesn't take its badge away (badges are kept
 // once earned; see `missingFor`).
+//
+// A module counts when it's done for real, not when the learner moved on past it: a module with a
+// code check counts once that check passed (`checkedIn`, from ./quest check), in any language. The
+// rest need no more than being done: a world check, a challenge or a boss is done only by passing
+// it, and a module with no check of its own yet has nothing else to show.
 import { solvedAt } from "./challenge.js";
 
 // A boss's hearts: a win with all of them left is Flawless.
@@ -29,6 +34,9 @@ export function badgeContext(modules, rightChoice) {
 }
 
 const ready = (ctx, ids) => ids.filter((id) => ctx.byId.get(id)?.status === "ready");
+const hasCodeCheck = (ctx, id) => ctx.byId.get(id)?.check === "code";
+// Whether a module counts towards badges: done, and its code check passed if it has one.
+const counts = (ctx, id, done, checkedIn) => done.has(id) && (!hasCodeCheck(ctx, id) || (checkedIn?.[id]?.length ?? 0) > 0);
 // The modules a boss or pass badge needs: its module, or a milestone's few (`modules`).
 const passIds = (badge) => badge.modules ?? (badge.module ? [badge.module] : []);
 
@@ -40,6 +48,14 @@ export function missingFor(badge, ctx, completed) {
   return ready(ctx, ids).filter((id) => !done.has(id));
 }
 
+// The modules a badge needs that are done but whose code check hasn't passed: what's left is to
+// run it (./quest check).
+export function uncheckedFor(badge, ctx, completed, checkedIn) {
+  const done = new Set(completed);
+  const ids = badge.kind === "tier" ? badge.modules : passIds(badge);
+  return ready(ctx, ids).filter((id) => done.has(id) && !counts(ctx, id, done, checkedIn));
+}
+
 // Whether nothing a badge needs has shipped yet (a stub branch's tier, a boss to come).
 export function isComingSoon(badge, ctx) {
   if (badge.kind === "tier") return ready(ctx, badge.modules).length === 0;
@@ -48,22 +64,24 @@ export function isComingSoon(badge, ctx) {
 }
 
 // Does the learner meet a badge's criteria now? `state`: { completed, attempts, solutionUsed,
-// bossResults: [{ won, hearts }], passedIn: { F2: ["python", "typescript"] } }.
+// bossResults: [{ won, hearts }], checkedIn: { F2: ["python", "typescript"] } }: the languages
+// each code check passed in.
 export function meets(badge, ctx, state) {
   const done = state.completed instanceof Set ? state.completed : new Set(state.completed);
+  const counted = (id) => counts(ctx, id, done, state.checkedIn);
   const branchList = [...ctx.branches.values()];
   switch (badge.kind === "skill" ? badge.rule : badge.kind) {
     case "tier": {
       const need = ready(ctx, badge.modules);
-      return need.length > 0 && need.every((id) => done.has(id));
+      return need.length > 0 && need.every(counted);
     }
     case "boss":
     case "pass": {
       const need = ready(ctx, passIds(badge));
-      return need.length > 0 && need.every((id) => done.has(id));
+      return need.length > 0 && need.every(counted);
     }
     case "explorer":
-      return branchList.length > 0 && branchList.every((mods) => mods.some((m) => m.kind === "module" && done.has(m.id)));
+      return branchList.length > 0 && branchList.every((mods) => mods.some((m) => m.kind === "module" && counted(m.id)));
     case "clean-run":
       return branchList.some((mods) => {
         const challenges = mods.filter((m) => m.kind === "challenge");
@@ -71,13 +89,13 @@ export function meets(badge, ctx, state) {
       });
     case "no-peeking": {
       const used = new Set(state.solutionUsed ?? []);
-      return branchList.some((mods) => mods.every((m) => done.has(m.id) && !used.has(m.id)));
+      return branchList.some((mods) => mods.every((m) => counted(m.id) && !used.has(m.id)));
     }
     case "flawless":
       return (state.bossResults ?? []).some((r) => r.won && r.hearts >= HEARTS);
-    // The same module with a code check, passed in two languages.
+    // The same module's code check, passed in two languages.
     case "polyglot":
-      return Object.entries(state.passedIn ?? {}).some(([id, langs]) => ctx.byId.get(id)?.check === "code" && new Set(langs).size >= 2);
+      return Object.entries(state.checkedIn ?? {}).some(([id, langs]) => hasCodeCheck(ctx, id) && new Set(langs).size >= 2);
     default:
       return false;
   }

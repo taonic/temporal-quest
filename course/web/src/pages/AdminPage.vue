@@ -78,6 +78,7 @@ const EVENT_LABELS = {
   access_rejected: "was turned down",
   module_opened: "opened",
   module_passed: "passed",
+  check_passed: "passed the check of",
   check_failed: "failed the check of",
   challenge_pick: "picked in",
   quiz_pick: "answered the question in",

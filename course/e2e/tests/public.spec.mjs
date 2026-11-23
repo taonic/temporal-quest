@@ -179,10 +179,12 @@ test.describe("the site, signed out", { tag: "@public" }, () => {
   });
 
   test("a finished tier's badge shows on the map and the shelf, and the next tier's says what earns it", async ({ page }) => {
-    await page.addInitScript(([key, view]) => {
+    await page.addInitScript(([key, checked, view]) => {
       localStorage.setItem(key, JSON.stringify(["F1", "F2", "F3", "F4", "F5", "FC1", "F6", "F7", "FC2"]));
+      // Its modules with a code check (F2, F7) count once the check passed, not by moving on.
+      localStorage.setItem(checked, JSON.stringify({ F2: ["python"], F7: ["python"] }));
       localStorage.setItem(view, JSON.stringify("focus"));
-    }, [storageKey("modules"), storageKey("map-view")]);
+    }, [storageKey("modules"), storageKey("checked-in"), storageKey("map-view")]);
     await page.goto("/");
     await expect(page.locator(".focus-reward")).toContainText("Finish this tier to earn Blocksmith");
     await page.getByRole("button", { name: "Full map", exact: true }).click();
