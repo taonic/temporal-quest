@@ -461,3 +461,21 @@ test("a language's sandbox: its snapshot and label, its terminals' folder, its w
   assert.ok(deleted, "the TypeScript sandbox is deleted");
   assert.notEqual((await manager.describe("learner")).state, "language", "nobody is asked");
 });
+
+test("Daytona not answering in time doesn't make a ready sandbox look stopped", async () => {
+  const manager = new SandboxManager({ maxSandboxes: 5, snapshot: "py" });
+  const sandbox = { id: "sb", state: "started", labels: {}, refreshData: () => new Promise(() => {}) };
+  manager.cache.set("l", { sandbox, at: Date.now() });
+  manager.ready.set("sb", Date.now());
+  let looked = 0;
+  manager.find = async (_learner, { fresh } = {}) => (fresh ? (looked++, null) : sandbox);
+  const started = Date.now();
+  const state = await manager.describe("l");
+  assert.equal(state.state, "ready", "still ready: Daytona only didn't answer");
+  assert.equal(looked, 0, "it didn't go looking for it from scratch");
+  assert.ok(Date.now() - started < 11_000);
+  // Daytona saying it's gone does send it looking.
+  sandbox.refreshData = async () => { throw new Error("Sandbox not found"); };
+  assert.equal((await manager.describe("l")).state, "none");
+  assert.equal(looked, 1);
+});

@@ -68,9 +68,12 @@ const tiers = ["@public", "@auth", "@sandbox"].map((tag) => {
 const minutes = ((stats.duration ?? 0) / 60000).toFixed(1);
 const date = new Date(stats.startTime ?? Date.now()).toISOString().slice(0, 10);
 const host = new URL(BASE_URL).host;
+// CI runs a part a job (E2E_PART): core, or a language's walkthroughs. Each says which it was.
+const PART_NAMES = { typescript: "TypeScript", java: "Java", dotnet: "C#" };
+const part = PART_NAMES[process.env.E2E_PART] ? ` (${PART_NAMES[process.env.E2E_PART]})` : "";
 const subject = ok
-  ? `✅ Course e2e passed · ${host} · ${date}`
-  : `❌ Course e2e: ${failed.length || globalErrors.length} failing · ${host} · ${date}`;
+  ? `✅ Course e2e${part} passed · ${host} · ${date}`
+  : `❌ Course e2e${part}: ${failed.length || globalErrors.length} failing · ${host} · ${date}`;
 const counts = `${passed.length} passed, ${failed.length} failed, ${flaky.length} flaky, ${skipped.length} skipped · ${minutes} min`;
 const tierIcon = { passed: "✅", failed: "❌", skipped: "⏭️", absent: "—" };
 

@@ -209,16 +209,19 @@ export class SandboxManager {
   }
 
   // A fresh read of the sandbox's state (find() may hand back a cached object).
+  // Daytona not answering in time (busy, with many sandboxes polled at once) isn't the sandbox
+  // going: what was known of it still holds, so a page isn't told its sandbox stopped when it
+  // hasn't. Only Daytona saying so (gone, or not found) sends it looking again.
   async refreshed(learner) {
     const sandbox = await this.find(learner);
     if (!sandbox) return null;
     try {
       await withTimeout(sandbox.refreshData(), 10_000, "Reading the sandbox");
-      if (GONE.has(sandbox.state)) throw new Error("gone");
-      return sandbox;
-    } catch {
+    } catch (err) {
+      if (!/not found|404|deleted/i.test(err.message ?? "")) return sandbox;
       return this.find(learner, { fresh: true });
     }
+    return GONE.has(sandbox.state) ? this.find(learner, { fresh: true }) : sandbox;
   }
 
   // `language`: the one the page builds in. A sandbox used in another isn't ready for it: the page
@@ -228,7 +231,15 @@ export class SandboxManager {
     const failed = this.progress.get(learner);
     // Kept until the learner starts again: an error, no room, or a sandbox for another language.
     if (failed?.state === "error" || failed?.state === "full" || failed?.state === "language") return failed;
-    const sandbox = await this.refreshed(learner);
+    let sandbox;
+    try {
+      sandbox = await this.refreshed(learner);
+    } catch (err) {
+      // Daytona didn't answer even the lookup: a sandbox that was ready a moment ago still is.
+      const known = this.cache.get(learner)?.sandbox;
+      if (known && this.ready.has(known.id)) return { state: "ready", sandboxId: known.id };
+      throw err;
+    }
     if (!sandbox) return { state: "none" };
     if (sandbox.state === "started" && this.ready.has(sandbox.id)) {
       if (language && workingLanguage(sandbox) !== language) return { state: "waking", sandboxId: sandbox.id };

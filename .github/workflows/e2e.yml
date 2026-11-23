@@ -110,9 +110,17 @@ jobs:
           echo "languages=${languages# }" >> "$GITHUB_OUTPUT"
           echo "E2E tier: $tier (other languages' walkthroughs: ${languages:- none})" >> "$GITHUB_STEP_SUMMARY"
 
+  # A job a part, side by side on runners of their own: core (the signed-out and signed-in tiers,
+  # the sandbox tier and Python's walkthroughs), and each other language's walkthroughs. A language's
+  # part runs only with every tier, and (except by hand) when scope says its code or modules changed.
   e2e:
     needs: scope
     if: needs.scope.outputs.tier != 'none'
+    name: e2e (${{ matrix.part }})
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [core, typescript, java, dotnet]
     runs-on: ubuntu-latest
     timeout-minutes: 60
     defaults:
@@ -128,6 +136,8 @@ jobs:
       # with no code. Else the variable: one of the app's ADMIN_EMAILS.
       E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL || vars.E2E_ADMIN_EMAIL }}
       E2E_SKIP_SANDBOX: ${{ vars.E2E_SKIP_SANDBOX }}
+      # Which part this job runs (global-teardown.mjs deletes only its leftovers; the summary names it).
+      E2E_PART: ${{ matrix.part }}
     steps:
       # After a deploy, the tests as they were in what was deployed.
       - uses: actions/checkout@v4
@@ -152,24 +162,27 @@ jobs:
       - name: Run the tests
         id: tests
         run: |
-          case "$TIER" in
-            all)    grep="" ;;
-            public) grep="--grep=@public" ;;
-            auth)   grep="--grep=@public|@auth" ;;
-            *)      echo "unknown tier: $TIER"; exit 2 ;;
-          esac
-          # A run by hand tests every language; otherwise another language's walkthroughs only when
-          # scope said so.
-          skip=""
-          if [ "$GITHUB_EVENT_NAME" != workflow_dispatch ]; then
-            for language in typescript java dotnet; do
-              case " $LANGUAGES " in *" $language "*) ;; *) skip="$skip|@$language" ;; esac
-            done
+          if [ "$E2E_PART" = core ]; then
+            case "$TIER" in
+              all)    grep="" ;;
+              public) grep="--grep=@public" ;;
+              auth)   grep="--grep=@public|@auth" ;;
+              *)      echo "unknown tier: $TIER"; exit 2 ;;
+            esac
+            npx playwright test $grep --grep-invert="@typescript|@java|@dotnet"
+            exit
           fi
-          npx playwright test $grep ${skip:+"--grep-invert=${skip#|}"}
+          # A language's walkthroughs: with every tier, and (except by hand) when scope said so.
+          if [ "$TIER" != all ] || { [ "$GITHUB_EVENT_NAME" != workflow_dispatch ] && ! case " $LANGUAGES " in *" $E2E_PART "*) true ;; *) false ;; esac; }; then
+            echo "Not this run: $E2E_PART's walkthroughs (tier $TIER, languages: ${LANGUAGES:-none})."
+            echo "skipped=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # The switch tests are Java's (Java to Python, Java to C#): C#'s part leaves them to it.
+          npx playwright test --grep="@$E2E_PART" ${{ matrix.part == 'dotnet' && '--grep-invert=@java' || '' }}
 
       - name: Summarize
-        if: always()
+        if: always() && steps.tests.outputs.skipped != 'true'
         env:
           E2E_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           E2E_MAIL_TO: ${{ vars.E2E_MAIL_TO }}
@@ -180,10 +193,10 @@ jobs:
         id: summary
 
       - name: Keep the report
-        if: always()
+        if: always() && steps.tests.outputs.skipped != 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-report-${{ github.run_id }}
+          name: e2e-report-${{ github.run_id }}-${{ matrix.part }}
           path: |
             course/e2e/reports/
             course/e2e/test-results/
@@ -208,7 +221,7 @@ jobs:
       # Resend's HTTP API with curl, no SDK or third-party action. The message is the one
       # scripts/summary.mjs wrote.
       - name: Email the result
-        if: always() && steps.newer.outputs.superseded != 'true' && (env.EMAIL == 'always' || (env.EMAIL == 'failure' && steps.tests.outcome != 'success'))
+        if: always() && steps.tests.outputs.skipped != 'true' && steps.newer.outputs.superseded != 'true' && (env.EMAIL == 'always' || (env.EMAIL == 'failure' && steps.tests.outcome != 'success'))
         env:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
         run: |

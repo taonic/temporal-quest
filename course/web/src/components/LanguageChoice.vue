@@ -35,7 +35,6 @@ onMounted(() => nextTick(() => first.value?.focus({ preventScroll: true })));
     <section class="persona-choice" role="dialog" aria-modal="true" aria-labelledby="language-title">
       <p class="eyebrow">Temporal Quest</p>
       <h2 id="language-title">{{ switching ? "Switch your language" : "Which language do you build in?" }}</h2>
-      <p class="persona-sub">You'll write the modules' code in it. Where a module doesn't come in it yet, it's in Python. You can switch any time, and your progress stays with you.</p>
       <div class="persona-cards">
         <button
           v-for="(l, i) in course.languages"

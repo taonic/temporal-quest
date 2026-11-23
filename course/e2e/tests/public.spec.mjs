@@ -338,7 +338,7 @@ test.describe("a module, signed in", { tag: "@auth" }, () => {
     // Nothing completed yet (Next doesn't complete a module): the first-run view, then the map.
     await page.getByRole("button", { name: /Show the whole map/ }).click();
     await expect(page.locator(".map-player h1")).toBeVisible();
-    await expect(page.locator(".map-path-pick select")).toHaveValue("agent-governance-4h");
+    await expect(page.locator(".map-path-pick:not(.map-concept-pick) select")).toHaveValue("agent-governance-4h");
   });
 
   test("Ask Temporal opens from the top bar and closes with Esc", async ({ page }) => {
