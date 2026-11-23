@@ -1,0 +1,92 @@
+<!doctype html>
+<!-- The link preview (Slack, LinkedIn, X…): 1200×630. Render it with: node og/render.mjs -->
+<html>
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=block" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 1200px; height: 630px; }
+  body {
+    font-family: Inter, sans-serif; color: #f3f6fb; overflow: hidden; position: relative;
+    background:
+      radial-gradient(720px 460px at 95% 0%, rgba(182,100,255,.26), transparent 70%),
+      radial-gradient(640px 480px at 0% 100%, rgba(68,76,231,.30), transparent 70%),
+      #0f1115;
+  }
+  body::before {
+    content: ""; position: absolute; inset: 0;
+    background-image: linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+    background-size: 40px 40px;
+    mask-image: linear-gradient(90deg, #000, transparent 80%);
+  }
+  .wrap { position: relative; display: flex; height: 100%; padding: 64px 56px 56px 72px; gap: 44px; }
+  .left { width: 500px; flex: none; display: flex; flex-direction: column; }
+  .brand { display: flex; align-items: center; gap: 18px; }
+  .brand svg { width: 68px; height: 68px; flex: none; }
+  .brand span { font-size: 48px; font-weight: 800; letter-spacing: -.025em; }
+  h1 { margin-top: 40px; font-size: 52px; line-height: 1.08; font-weight: 800; letter-spacing: -.025em; }
+  h1 em { font-style: normal; background: linear-gradient(90deg, #818cf8, #c084fc); -webkit-background-clip: text; color: transparent; }
+  .sub { margin-top: 20px; font-size: 23px; line-height: 1.42; color: #a3aabb; }
+  .chips { margin-top: auto; display: flex; flex-wrap: wrap; gap: 10px; }
+  .chip { font-size: 17px; font-weight: 600; padding: 8px 15px; border-radius: 999px; border: 1px solid #343846; background: rgba(22,24,29,.85); color: #d5d9e6; }
+
+  .shot { position: relative; flex: 1; min-width: 0; align-self: flex-start; margin-top: 30px; }
+  .win {
+    border-radius: 14px; border: 1px solid #2e3240; background: #0d0d10; overflow: hidden;
+    box-shadow: 0 30px 80px rgba(0,0,0,.55), 0 0 0 1px rgba(129,140,248,.08);
+    font-family: "JetBrains Mono", ui-monospace, monospace; font-variant-ligatures: none;
+  }
+  .tabs { display: flex; align-items: center; gap: 4px; padding: 10px 12px 0; background: #16181d; border-bottom: 1px solid #262a35; }
+  .lights { display: flex; gap: 7px; margin-right: 12px; padding-bottom: 10px; }
+  .lights i { width: 11px; height: 11px; border-radius: 50%; background: #3a3e4a; }
+  .tab { font-size: 13.5px; padding: 8px 14px 9px; color: #7f8794; border-radius: 8px 8px 0 0; }
+  .tab.on { background: #0d0d10; color: #e8ebf3; box-shadow: inset 0 2px 0 #818cf8; }
+  pre { padding: 16px 0 18px; font-size: 14.5px; overflow: hidden; line-height: 1.62; color: #abb2bf; font-family: inherit; }
+  .ln { display: inline-block; width: 40px; padding-right: 14px; text-align: right; color: #4b5263; }
+  .hl { display: block; background: rgba(129,140,248,.12); box-shadow: inset 3px 0 0 #818cf8; }
+  .k { color: #c678dd; } .f { color: #61afef; } .s { color: #98c379; } .c { color: #7f8794; font-style: italic; } .n { color: #d19a66; } .d { color: #e5c07b; }
+  .term { border-top: 1px solid #262a35; background: #111216; padding: 12px 18px 14px; font-size: 14px; line-height: 1.6; }
+  .term .p { color: #818cf8; } .term .o { color: #8790a3; }
+  .pass {
+    position: absolute; right: -16px; top: -30px; display: flex; align-items: center; gap: 12px;
+    padding: 12px 18px; border-radius: 14px; background: #10251e; border: 1px solid rgba(126,226,184,.4);
+    box-shadow: 0 16px 40px rgba(0,0,0,.5); font-size: 18px; font-weight: 700; color: #a7f3d0;
+  }
+  .pass .tick { width: 28px; height: 28px; border-radius: 50%; background: #34d399; color: #0b2a20; display: grid; place-items: center; font-size: 17px; font-weight: 800; }
+  .pass .xp { color: #fbbf24; margin-left: 4px; }
+  .ask {
+    position: absolute; left: -34px; top: calc(100% - 16px); width: 380px; padding: 14px 16px 15px; border-radius: 14px;
+    background: #1a1c2b; border: 1px solid rgba(129,140,248,.45); box-shadow: 0 18px 44px rgba(0,0,0,.55);
+    font-size: 14.5px; line-height: 1.45;
+  }
+  .ask-head { display: flex; align-items: center; gap: 8px; font-weight: 700; color: #c7cbff; font-size: 14px; }
+  .spark { width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; font-size: 13px; color: #fff; background: linear-gradient(135deg, #444ce7, #b664ff); }
+  .ask .q { margin-top: 8px; color: #e8ebf3; font-weight: 600; }
+  .ask .a { margin-top: 4px; color: #a3aabb; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="left">
+    <div class="brand"><svg viewBox="0 0 192 192" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="192" height="192" rx="24" fill="url(#paint0_linear_1452_5317)"/><path d="M123.34 68.6596C119.655 41.0484 110.327 18 96 18C81.6731 18 72.3454 41.0484 68.6596 68.6596C41.0484 72.3454 18 81.6731 18 96C18 110.327 41.0525 119.655 68.6596 123.34C72.3454 150.948 81.6731 174 96 174C110.327 174 119.655 150.948 123.34 123.34C150.952 119.655 174 110.327 174 96C174 81.6731 150.948 72.3454 123.34 68.6596ZM67.7583 115.298C41.3151 111.479 25.893 102.737 25.893 96C25.893 89.2629 41.3151 80.5212 67.7583 76.7021C67.1764 83.0674 66.8733 89.566 66.8733 96C66.8733 102.434 67.1764 108.937 67.7583 115.298ZM96 25.893C102.737 25.893 111.479 41.3151 115.298 67.7583C108.937 67.1764 102.434 66.8733 96 66.8733C89.566 66.8733 83.0633 67.1764 76.7021 67.7583C80.5212 41.3151 89.2629 25.893 96 25.893ZM124.242 115.298C122.94 115.488 117.602 116.114 116.252 116.248C116.118 117.602 115.488 122.936 115.302 124.238C111.483 150.681 102.741 166.103 96.0041 166.103C89.267 166.103 80.5253 150.681 76.7061 124.238C76.5202 122.936 75.8898 117.598 75.7564 116.248C75.1421 109.979 74.7703 103.246 74.7703 96C74.7703 88.7537 75.1421 82.0206 75.7564 75.7483C82.0247 75.134 88.7577 74.7622 96.0041 74.7622C103.25 74.7622 109.983 75.134 116.252 75.7483C117.606 75.8817 122.94 76.5121 124.242 76.698C150.685 80.5172 166.111 89.2629 166.111 95.996C166.111 102.729 150.685 111.479 124.242 115.298Z" fill="#F2F2F2"/><defs><linearGradient id="paint0_linear_1452_5317" x1="183" y1="192" x2="-2.23688e-06" y2="2.13203e-06" gradientUnits="userSpaceOnUse"><stop stop-color="#444CE7"/><stop offset="1" stop-color="#B664FF"/></linearGradient></defs></svg><span>Temporal Quest</span></div>
+    <h1>Learn Temporal<br><em>interactively</em>,<br>in your browser</h1>
+    <p class="sub">Run real code in a sandbox of your own, with AI help whenever you&rsquo;re stuck.</p>
+    <div class="chips">
+      <span class="chip">Python</span><span class="chip">TypeScript</span><span class="chip">Java</span><span class="chip">.NET</span>
+    </div>
+  </div>
+  <div class="shot">
+    <div class="win">
+      <div class="tabs"><span class="lights"><i></i><i></i><i></i></span><span class="tab on">hold.py</span><span class="tab">starter.py</span></div>
+<pre><span class="ln">31</span><span class="d">@workflow.run</span>
+<span class="ln">32</span><span class="k">async def</span> <span class="f">run</span>(self, hold: HoldRequest) -&gt; <span class="d">str</span>:
+<span class="hl"><span class="ln">33</span>    <span class="c"># Paid for, or the hold runs out</span></span><span class="hl"><span class="ln">34</span>    <span class="k">await</span> workflow.<span class="f">wait_condition</span>(</span><span class="hl"><span class="ln">35</span>        <span class="k">lambda</span>: self.paid_with <span class="k">is not</span> <span class="n">None</span>,</span><span class="hl"><span class="ln">36</span>        timeout=<span class="f">timedelta</span>(seconds=hold.seconds),</span><span class="hl"><span class="ln">37</span>    )</span><span class="ln">38</span>    <span class="k">return</span> <span class="s">f"Seat {self.seat}: it's yours."</span></pre>
+      <div class="term"><span class="p">$</span> uv run hello-hold 12A 20<br><span class="o">Holding seat 12A for 20s: hold-12a-3f9c</span></div>
+    </div>
+    <div class="ask"><div class="ask-head"><span class="spark">✦</span>Ask Temporal</div><div class="q">Why does the hold survive a worker restart?</div><div class="a">The timeout is a durable timer: Temporal keeps it, so it fires even with no worker running.</div></div>
+    <div class="pass"><span class="tick">✓</span>Check passed <span class="xp">+10 XP</span></div>
+  </div>
+</div>
+</body>
+</html>
