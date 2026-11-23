@@ -479,3 +479,19 @@ test("Daytona not answering in time doesn't make a ready sandbox look stopped", 
   assert.equal((await manager.describe("l")).state, "none");
   assert.equal(looked, 1);
 });
+
+test("a sandbox the runner knows is found by its id, not by a label search that can miss it", async () => {
+  const manager = new SandboxManager({ maxSandboxes: 5, snapshot: "py" });
+  const sandbox = { id: "sb", state: "started", labels: {}, refreshData: async () => {} };
+  manager.cache.set("l", { sandbox, at: Date.now() - 10 * 60_000 }); // cached long enough ago to look again
+  manager.ready.set("sb", Date.now());
+  let searched = 0;
+  manager.daytona = { list: async function* () { searched++; } }; // Daytona's search: lagging, finds nothing
+  assert.equal((await manager.describe("l")).state, "ready");
+  assert.equal(searched, 0, "no label search for a sandbox it knows");
+  // Gone by its id: then it searches.
+  sandbox.refreshData = async () => { throw new Error("Sandbox not found"); };
+  manager.cache.set("l", { sandbox, at: Date.now() - 10 * 60_000 });
+  assert.equal((await manager.describe("l")).state, "none");
+  assert.ok(searched >= 1);
+});

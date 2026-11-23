@@ -192,7 +192,21 @@ export class SandboxManager {
 
   async find(learner, { fresh = false } = {}) {
     const cached = this.cache.get(learner);
-    if (cached && !fresh && Date.now() - cached.at < 5 * 60_000 && !this.deleted.has(cached.sandbox.id)) return cached.sandbox;
+    if (cached && !this.deleted.has(cached.sandbox.id)) {
+      if (!fresh && Date.now() - cached.at < 5 * 60_000) return cached.sandbox;
+      // One this runner knows: asked about by its id. Searching by label can miss a sandbox made
+      // a few minutes ago (Daytona's search lags), which told its page the sandbox had stopped.
+      try {
+        await withTimeout(cached.sandbox.refreshData(), 10_000, "Reading the sandbox");
+        if (!GONE.has(cached.sandbox.state)) {
+          this.cache.set(learner, { sandbox: cached.sandbox, at: Date.now() });
+          return cached.sandbox;
+        }
+      } catch (err) {
+        // Not answering isn't gone: what was known still holds. Not found is gone.
+        if (!/not found|404|deleted/i.test(err.message ?? "")) return cached.sandbox;
+      }
+    }
     const rows = await this.#list({ labels: { app: APP_LABEL, learner } });
     const found = rows.find((sandbox) => !GONE.has(sandbox.state) && !this.deleted.has(sandbox.id)) ?? null;
     if (found) this.cache.set(learner, { sandbox: found, at: Date.now() });
