@@ -16,6 +16,7 @@ import { javascript } from "@codemirror/lang-javascript";
 import { python } from "@codemirror/lang-python";
 import { csharp } from "@codemirror/legacy-modes/mode/clike";
 import { indentUnit, StreamLanguage } from "@codemirror/language";
+import { openSearchPanel } from "@codemirror/search";
 import { Annotation, Compartment, EditorState, StateEffect, StateField } from "@codemirror/state";
 import { oneDark } from "@codemirror/theme-one-dark";
 import { Decoration, EditorView, keymap } from "@codemirror/view";
@@ -879,6 +880,21 @@ let unregisterSwap = null;
 let unregisterEditor = null;
 // The tab on show, for Ask Temporal's "send my code" chip.
 watch([active, view], () => (store.editorPath = `${active.value}|${view.value}`), { immediate: true });
+
+// Find. The editor draws only the lines near the screen, so the browser's own find can't see the
+// rest of the file. With the cursor in the editor, Cmd/Ctrl-F already opens the editor's search
+// (basicSetup's); after a click anywhere else in the code panel (its tabs, its toolbar), it does
+// too. After a click outside it (the guide, the terminal), Cmd/Ctrl-F is the browser's again.
+const root = ref(null);
+let codeInUse = false;
+const notePointer = (event) => (codeInUse = Boolean(root.value?.contains(event.target)));
+function findInCode(event) {
+  if (!(event.metaKey || event.ctrlKey) || event.shiftKey || event.altKey || event.key.toLowerCase() !== "f") return;
+  if (!codeInUse || !props.shown || !editor || editor.hasFocus) return;
+  event.preventDefault();
+  editor.focus();
+  openSearchPanel(editor);
+}
 onMounted(() => {
   editor = new EditorView({ state: makeState(currentText()), parent: host.value });
   shownKey = `${active.value}|${view.value}|${canEdit.value}`;
@@ -899,6 +915,8 @@ onMounted(() => {
     return { path: active.value, text: editor.state.doc.toString(), view: view.value, selection: editor.state.sliceDoc(from, to), editable: Boolean(activeFile.value?.editable) };
   });
   window.addEventListener("beforeunload", saveNow);
+  window.addEventListener("pointerdown", notePointer, true);
+  window.addEventListener("keydown", findInCode, true);
 });
 
 onBeforeUnmount(() => {
@@ -914,11 +932,13 @@ onBeforeUnmount(() => {
   store.fileTexts = {};
   store.editorPath = "";
   window.removeEventListener("beforeunload", saveNow);
+  window.removeEventListener("pointerdown", notePointer, true);
+  window.removeEventListener("keydown", findInCode, true);
 });
 </script>
 
 <template>
-  <div class="code-editor" data-tour="editor">
+  <div ref="root" class="code-editor" data-tour="editor">
     <div class="file-tabs" role="tablist" aria-label="Exercise files">
       <button
         v-for="file in tabs"
