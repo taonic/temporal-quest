@@ -40,6 +40,11 @@ tour:
     from: "    @workflow.query"
     title: Reading it
     body: "A query, like the boarding count's: the Temporal UI's **Queries** tab calls `status` and shows how many seconds the hold has left."
+  - file: hello/starter.py
+    from: "async def hold(seat"
+    to: "Pay for it with"
+    title: What hello-hold runs
+    body: "The command you'll run: it starts a `FareHoldWorkflow` and returns without waiting for its result. The hold does the waiting, on the server, so this terminal is free for the next command."
 langs:
   typescript:
     files:
@@ -68,6 +73,11 @@ langs:
         to: "  }));"
         title: Reading it
         body: "A query, like the boarding count's: the Temporal UI's **Queries** tab calls `status` and shows how many seconds the hold has left."
+      - file: langs/typescript/hello/src/starter.ts
+        from: "if (command === 'hold')"
+        to: "Pay for it with"
+        title: What npm run hold runs
+        body: "The command you'll run: it starts a `FareHoldWorkflow` and returns without waiting for its result. The hold does the waiting, on the server, so this terminal is free for the next command."
   java:
     files:
       - path: langs/java/hello/src/main/java/hello/FareHoldWorkflowImpl.java
@@ -95,6 +105,11 @@ langs:
         from: "    public HoldStatus status()"
         title: Reading it
         body: "A query, like the boarding count's: the Temporal UI's **Queries** tab calls `status` and shows how many seconds the hold has left."
+      - file: langs/java/hello/src/main/java/hello/Starter.java
+        from: "case \"hold\" ->"
+        to: "Pay for it with"
+        title: What ./hello hold runs
+        body: "The command you'll run: it starts a `FareHoldWorkflow` and returns without waiting for its result. The hold does the waiting, on the server, so this terminal is free for the next command."
   dotnet:
     files:
       - path: langs/dotnet/hello/FareHoldWorkflow.cs
@@ -121,6 +136,11 @@ langs:
         from: "    [WorkflowQuery(\"status\")]"
         title: Reading it
         body: "A query, like the boarding count's: the Temporal UI's **Queries** tab calls `status` and shows how many seconds the hold has left."
+      - file: langs/dotnet/hello/Starter.cs
+        from: "case \"hold\":"
+        to: "Pay for it with"
+        title: What ./hello hold runs
+        body: "The command you'll run: it starts a `FareHoldWorkflow` and returns without waiting for its result. The hold does the waiting, on the server, so this terminal is free for the next command."
 ---
 
 Fundamentals' first tier was one idea: the history is the program's memory. This tier is what you build with it, one tool a module, at the same travel company:
@@ -197,7 +217,7 @@ npm run hold -- 12A 20
 ```
 <!-- /lang -->
 
-It starts the hold and returns. <!-- browser
+It starts the hold and returns: that's <!-- lang python -->`hold()` in `hello/starter.py`<!-- /lang --><!-- lang typescript -->the `hold` command in `src/starter.ts`<!-- /lang --><!-- lang dotnet -->the `hold` case in `Starter.cs`<!-- /lang --><!-- lang java -->the `hold` case in `Starter.java`<!-- /lang -->. <!-- browser
 [Open the hold](#workflow/hold-12a)
 --><!-- local -->Open the link it printed<!-- /local -->: it's **Running**. Its **Queries** tab, with **status**, shows the seconds left. After 20 seconds it's **Completed**, and its **Result** is `Seat 12A: the hold expired, and the seat is back on sale.`
 
