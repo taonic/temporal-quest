@@ -191,13 +191,14 @@ test.describe("the site, signed out", { tag: "@public" }, () => {
     // The top bar's pill opens the shelf.
     await page.locator(".xp-pill").click();
     await expect(page).toHaveURL(/#\/badges$/);
-    await expect(page.locator(".badges-head h1")).toContainText("of 19 earned");
+    // How many there are changes with each new badge: the count is what's earned of them.
+    await expect(page.locator(".badges-head h1")).toHaveText(/^\d+ of \d+ earned$/);
     const earned = page.locator('.badge-card[data-badge="fundamentals-1"]');
     await expect(earned).toContainText("Survived the Crash");
     await expect(earned).toContainText("Earned");
     const next = page.locator('.badge-card[data-badge="fundamentals-2"]');
     await expect(next).toHaveClass(/is-locked/);
-    await expect(next).toContainText("Pass F8–F13 and FC3");
+    await expect(next).toContainText("Pass F8–F14 and FC3");
     await expect(page.locator('.badge-card[data-badge="fundamentals-boss"]')).toContainText("Coming soon");
     // It closes back to where it was opened from: the map.
     await page.getByRole("button", { name: "Close your badges" }).click();
