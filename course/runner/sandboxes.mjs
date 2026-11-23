@@ -176,6 +176,7 @@ export class SandboxManager {
     this.progress = new Map(); // learner -> { state, message, error? }
     this.inflight = new Map(); // learner -> { run, promise }: the start in progress
     this.ready = new Map(); // sandbox id -> verified at
+    this.described = new Map(); // learner -> the state describe() last told their page
     this.envChecked = new Set(); // sandbox ids whose .env this runner has written or checked
     this.current = new Set(); // sandbox ids this runner has seen with the kept-current folders as they are
     this.previews = new Map(); // `${id}:${port}` -> { url, expiresAt }
@@ -227,6 +228,22 @@ export class SandboxManager {
   // `language`: the one the page builds in. A sandbox used in another isn't ready for it: the page
   // then starts it, which switches it (to Python) or asks about a new one (another language).
   async describe(learner, language = null) {
+    let state;
+    try {
+      state = await this.#describe(learner, language);
+    } catch (err) {
+      if (this.described.get(learner) === "ready") console.log(`${new Date().toISOString()} learner ${learner}'s sandbox: describing it failed: ${err.message}`);
+      throw err;
+    }
+    // A sandbox this runner called ready that it no longer does: why, for the log (a page that sees
+    // it says the sandbox stopped).
+    const was = this.described.get(learner);
+    if (was === "ready" && state?.state !== "ready") console.log(`${new Date().toISOString()} learner ${learner}'s sandbox no longer ready: ${state?.state} ${state?.message ?? ""}`.trim());
+    this.described.set(learner, state?.state);
+    return state;
+  }
+
+  async #describe(learner, language) {
     if (this.inflight.has(learner)) return this.progress.get(learner);
     const failed = this.progress.get(learner);
     // Kept until the learner starts again: an error, no room, or a sandbox for another language.

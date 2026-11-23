@@ -649,6 +649,12 @@ export async function startSandbox() {
 export async function resumeSandbox() {
   if (!store.authenticated) return;
   await pollSandbox();
+  // One answer that isn't "ready" may only be the runner or Daytona slow to answer (with many
+  // sandboxes polled at once): one this page had is asked twice more before it's called lost.
+  for (let again = 0; again < 2 && wasReady && store.sandbox.state !== "ready"; again++) {
+    await new Promise((resolve) => setTimeout(resolve, 4000));
+    await pollSandbox();
+  }
   if (store.sandbox.state === "ready") return;
   if (wasReady && store.authenticated) {
     clearTimeout(sandboxPoll);
