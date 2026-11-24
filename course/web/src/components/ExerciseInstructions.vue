@@ -841,6 +841,13 @@ function onClick(event) {
   } else if (target.matches("button[data-insert]")) {
     const act = target.classList.contains("is-inserted") ? revertFromEditor : insertIntoEditor;
     act(target.dataset.insert, snippetCode(target), target.dataset.insertMode);
+  } else if (target.matches("button[data-code-file]")) {
+    // The code a command runs, in the editor, its lines lit. A file the exercise doesn't show
+    // opens from the sandbox, so without one it's named instead.
+    const { codeFile, codeLines } = target.dataset;
+    if (!openFile(codeFile, codeLines)) {
+      toast(`It's ${codeFile}, lines ${codeLines.replace("-", "–")}.${mode.value === "browser" ? " Start your sandbox to open it here." : ""}`, 6000);
+    }
   } else if (target.matches("button[data-copy]")) {
     copy(target.closest(".snippet")?.querySelector("pre")?.innerText ?? "");
   } else if (target.matches("code.file-ref")) {

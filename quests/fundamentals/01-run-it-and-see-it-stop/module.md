@@ -259,6 +259,8 @@ There's no agent yet. Every idea here comes back in the next three exercises.
 | **History** | Every step, recorded by Temporal: the source of truth. | The Temporal UI, http://localhost:8233 |
 <!-- /lang -->
 
+<!-- lang python -->Each `hello-…` command is in `hello/starter.py`<!-- /lang --><!-- lang typescript -->Each `npm run …` is in `src/starter.ts`<!-- /lang --><!-- lang dotnet -->Each `./hello …` is a case in `Starter.cs`<!-- /lang --><!-- lang java -->Each `./hello …` is a case in `Starter.java`<!-- /lang -->: **Code** opens it.
+
 ### How the pieces fit together
 
 Follow a trip through this diagram: from the starter to the server, the worker and the activity, and back. The steps below break or stop these pieces one at a time, so it helps to know where each sits. Click it to explore a larger version.

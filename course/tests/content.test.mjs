@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 import { test } from "node:test";
 
 import { applyMode, buildCourse, parseFrontmatter, sectionKind, snippetCommands, splitSections } from "../content/build.mjs";
@@ -659,4 +661,49 @@ test("Building blocks in TypeScript: its own commands, files, snippets and chall
   const fc3 = ts.challenges.FC3;
   assert.ok(fc3, "FC3 is in TypeScript too");
   assert.ok(fc3.choices.every((c) => !/workflow\.|await workflow/.test(c.code)), "its choices are TypeScript");
+});
+
+test("a command's code: the entry it starts with, after any settings, the longest", async () => {
+  const { codeOf } = await import("../content/build.mjs");
+  const codes = new Map([
+    ["java", [
+      { command: "./hello book", file: "Starter.java", lines: "87-104" },
+      { command: "./hello", file: "Main.java", lines: "1-2" },
+    ]],
+  ]);
+  assert.equal(codeOf("./hello book SFO JFK 0000", "java", codes).file, "Starter.java");
+  assert.equal(codeOf("FLAKY=1 ./hello book", "java", codes).file, "Starter.java");
+  assert.equal(codeOf("./hello bookings", "java", codes).file, "Main.java"); // a word, not a prefix
+  assert.equal(codeOf("./hello book", "python", codes), null);
+  assert.equal(codeOf("uv run hello-book", "java", codes), null);
+});
+
+test("branch.md's commands must point at lines that are there", async () => {
+  const { commandCodes } = await import("../content/build.mjs");
+  const branch = (commands) => ({ id: "fundamentals", languages: ["python"], commands });
+  const [found] = commandCodes([branch({ "uv run hello-book": { file: "hello/starter.py", from: "async def book(" } })]).get("python");
+  assert.equal(found.file, "hello/starter.py");
+  assert.match(found.lines, /^\d+-\d+$/);
+  assert.throws(() => commandCodes([branch({ "uv run x": { file: "hello/starter.py", from: "async def nothing_like_it(" } })]), /has no line with/);
+  assert.throws(() => commandCodes([branch({ "uv run x": { file: "hello/nope.py", from: "x" } })]), /doesn't exist/);
+  assert.throws(() => commandCodes([branch({ "uv run x": { file: "hello/starter.py", from: "async def book(", to: "no such line" } })]), /followed by/);
+});
+
+test("a command, in a block or in prose, gets a Code button to the code it runs, in every language", () => {
+  const blocks = buildCourse().exercises.find((e) => e.id === "06-building-blocks");
+  const html = (page) => page.modes.browser.sections.map((s) => s.html).join("\n");
+  const repoRoot = path.resolve(import.meta.dirname, "../..");
+  const lineOf = (file, text) => fs.readFileSync(path.join(repoRoot, file), "utf8").split("\n").findIndex((l) => l.includes(text)) + 1;
+  const py = html(blocks);
+  // The block that books: its Code button opens book() in the starter.
+  const book = lineOf("hello/starter.py", "async def book(");
+  assert.match(py, new RegExp(`class="snippet-btn snippet-code" type="button" data-code-file="hello/starter.py" data-code-lines="${book}-\\d+"`));
+  // Paying is a command in a bullet: its { } sits between it and its ▶.
+  const pay = lineOf("hello/starter.py", "async def pay(");
+  assert.match(py, new RegExp(`<code>uv run hello-pay 12A 4242</code><button class="cmd-code" type="button" data-code-file="hello/starter.py" data-code-lines="${pay}-\\d+"[^>]*>\\{ \\}</button><button class="cmd-run"`));
+  const java = html(blocks.byLang.java);
+  const starter = "langs/java/hello/src/main/java/hello/Starter.java";
+  assert.match(java, new RegExp(`data-code-file="${starter}" data-code-lines="${lineOf(starter, 'case "book" ->')}-\\d+"`));
+  // Locally there's no ▶, but there's still the code.
+  assert.match(blocks.modes.local.sections.map((s) => s.html).join("\n"), /<code>uv run hello-pay 12A 4242<\/code><button class="cmd-code"/);
 });

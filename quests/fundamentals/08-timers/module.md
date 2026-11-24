@@ -217,7 +217,7 @@ npm run hold -- 12A 20
 ```
 <!-- /lang -->
 
-It starts the hold and returns: that's <!-- lang python -->`hold()` in `hello/starter.py`<!-- /lang --><!-- lang typescript -->the `hold` command in `src/starter.ts`<!-- /lang --><!-- lang dotnet -->the `hold` case in `Starter.cs`<!-- /lang --><!-- lang java -->the `hold` case in `Starter.java`<!-- /lang -->. <!-- browser
+It starts the hold and returns. <!-- browser
 [Open the hold](#workflow/hold-12a)
 --><!-- local -->Open the link it printed<!-- /local -->: it's **Running**. Its **Queries** tab, with **status**, shows the seconds left. After 20 seconds it's **Completed**, and its **Result** is `Seat 12A: the hold expired, and the seat is back on sale.`
 

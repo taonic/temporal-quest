@@ -1627,6 +1627,33 @@ body.is-resizing iframe {
   color: #ffffff;
 }
 
+/* { }: the code a command runs. Between the command and its ▶, or last when it has none. */
+.cmd-code {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 6px;
+  border: 1px solid var(--line-strong);
+  border-right: 0;
+  background: var(--mist);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.72em;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.cmd-code:last-child {
+  border-right: 1px solid var(--line-strong);
+  border-radius: 0 5px 5px 0;
+}
+
+.cmd-code:hover {
+  background: var(--temporal-uv);
+  border-color: var(--temporal-uv);
+  color: #ffffff;
+}
+
 /* A worker command's ▶ while its worker runs: Stop. */
 .cmd-run.is-running {
   border-color: var(--danger);

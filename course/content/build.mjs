@@ -96,6 +96,41 @@ function useCommands(found) {
 }
 useCommands({ workers: ["uv run hello-worker", "uv run travel-worker"], starters: ["uv run hello-start"] });
 
+// The code each command runs (branch.md's `commands`, in each of its languages): language →
+// [{ command, file, lines }], the lines found by the entry's `from` and `to` in the file as it is.
+// A command block that runs one of them gets a Code button that opens those lines.
+let COMMAND_CODE = new Map();
+export function commandCodes(branches) {
+  const byLang = new Map();
+  for (const branch of branches) {
+    const source = `${QUESTS}/${branch.id}/branch.md`;
+    for (const lang of branch.languages ?? ["python"]) {
+      const given = lang === branch.languages[0] ? branch.commands : branch.langs?.[lang]?.commands;
+      for (const [command, where] of Object.entries(given ?? {})) {
+        const at = `${source}: commands (${lang}): ${command}`;
+        if (!where?.file || !where.from) throw new Error(`${at}: it needs a file and a from`);
+        const text = readIfExists(where.file);
+        if (text == null) throw new Error(`${at}: ${where.file} doesn't exist`);
+        const range = tourRange(text, where, { strict: true });
+        if (!range) throw new Error(`${at}: ${where.file} has no line with ${JSON.stringify(where.from)}${where.to ? ` followed by ${JSON.stringify(where.to)}` : ""}`);
+        const list = byLang.get(lang) ?? [];
+        if (list.some((c) => c.command === command)) throw new Error(`${at}: another branch says where it is too`);
+        list.push({ command, file: where.file, lines: `${range.start}-${range.end}` });
+        byLang.set(lang, list);
+      }
+    }
+  }
+  return byLang;
+}
+
+// The code a command line runs, in a language: the entry it starts with (after any VAR=value
+// settings), the longest when several do. Null when it's none of them.
+export function codeOf(commandLine, lang, codes = COMMAND_CODE) {
+  const bare = commandLine.replace(/^(?:\w+=\S+\s+)+/, "");
+  const found = (codes.get(lang) ?? []).filter((c) => bare === c.command || bare.startsWith(`${c.command} `));
+  return found.sort((a, b) => b.command.length - a.command.length)[0] ?? null;
+}
+
 // Every worker and starter command the branches and modules name, in any language.
 function questCommands(branches, modules) {
   const workers = new Set();
@@ -172,7 +207,7 @@ const FENCE_LANGUAGE = { python: "python", py: "python", typescript: "typescript
 // What a module's `langs.<language>` can give, in place of its own.
 const LANG_KEYS = ["files", "tour", "tourAfter", "questions", "hint", "worker"];
 // What a branch's `langs.<language>` can give.
-const BRANCH_LANG_KEYS = ["worker", "starter"];
+const BRANCH_LANG_KEYS = ["worker", "starter", "commands"];
 const LANG_BLOCK = /<!--\s*lang\s+([\w-]+)\s*-->\n?([\s\S]*?)<!--\s*\/lang\s*-->\n?/g;
 
 // The code blocks in some lines: where each starts and ends, and its language (null: none).
@@ -742,12 +777,18 @@ function createRenderer() {
         ? ` class="todo-ref" data-todo="${escapeAttr(content)}" title="Show it in the code"`
         : "";
     const code = `<code${attr}>${md.utils.escapeHtml(content)}</code>`;
-    if (env?.mode !== "browser" || !isInlineCommand(content)) return code;
+    // A command whose code branch.md names gets { }, which opens it: running it or only naming it.
+    const runs = codeOf(content, env?.lang);
+    const codeButton = runs
+      ? `<button class="cmd-code" type="button" data-code-file="${escapeAttr(runs.file)}" data-code-lines="${runs.lines}" ` +
+        `title="The code this runs: ${escapeAttr(runs.file.split("/").pop())}, lines ${runs.lines.replace("-", "–")}" aria-label="Show the code ${escapeAttr(content)} runs">{ }</button>`
+      : "";
+    if (env?.mode !== "browser" || !isInlineCommand(content)) return codeButton ? `<span class="cmd-ref">${code}${codeButton}</span>` : code;
     // The trip button says what it runs: the command beside it would only repeat it.
     if (HELLO_START.test(content)) return tripButton(content);
     const target = WORKER_COMMAND.test(content) ? "worker" : "commands";
     return (
-      `<span class="cmd-ref">${code}<button class="cmd-run" type="button" data-run="${escapeAttr(JSON.stringify([content]))}" ` +
+      `<span class="cmd-ref">${code}${codeButton}<button class="cmd-run" type="button" data-run="${escapeAttr(JSON.stringify([content]))}" ` +
       `data-target="${target}" title="Run it in the ${target} terminal" aria-label="Run ${escapeAttr(content)} in the ${target} terminal">▶</button></span>`
     );
   };
@@ -776,8 +817,15 @@ function createRenderer() {
         `title="${INSERT_TITLES[mode]} ${escapeAttr(target.path)}">← ${mode === "replace" ? "Replace in" : "Insert into"} ${escapeAttr(target.path.split("/").pop())}</button>` +
         actions;
     }
+    const commands = known === "bash" ? snippetCommands(code) : [];
+    // Code: what the command runs (a block of one, or of several that run the same code).
+    const runs = [...new Set(commands.map((c) => codeOf(c, env.lang)))];
+    const codeButton =
+      commands.length && runs.length === 1 && runs[0]
+        ? `<button class="snippet-btn snippet-code" type="button" data-code-file="${escapeAttr(runs[0].file)}" data-code-lines="${runs[0].lines}" ` +
+          `title="The code this runs: ${escapeAttr(runs[0].file.split("/").pop())}, lines ${runs[0].lines.replace("-", "–")}">{ } Code</button>`
+        : "";
     if (env.mode === "browser" && known === "bash") {
-      const commands = snippetCommands(code);
       // Starting a trip is the button, which says what it runs.
       if (commands.length === 1 && HELLO_START.test(commands[0])) return `<div class="trip-run">${tripButton(commands[0])}</div>\n`;
       if (commands.length) {
@@ -789,6 +837,7 @@ function createRenderer() {
           actions;
       }
     }
+    actions = codeButton + actions;
     return (
       `<div class="snippet"><div class="snippet-actions">${actions}</div>` +
       `<pre class="hljs lang-${escapeAttr(lang)}"><code>${html}</code></pre></div>\n`
@@ -888,7 +937,7 @@ function readIfExists(rel) {
 // `lang`: the language the page is in, whose project its file names are from.
 function renderPage(md, markdown, mode, sourceFile, files, lang = "python") {
   const { preamble, sections } = splitSections(applyMode(markdown, mode));
-  const env = { mode, sourceFile, files, homes: languageHomes(lang) };
+  const env = { mode, sourceFile, files, lang, homes: languageHomes(lang) };
   return {
     intro: md.render(preamble, env),
     sections: sections.map((section) => ({
@@ -1679,6 +1728,7 @@ function assembleCourse() {
   collectFiles();
   const quests = loadQuests();
   useCommands(questCommands(quests.branches, quests.modules));
+  COMMAND_CODE = commandCodes(quests.branches);
   const exercises = quests.paths.flatMap((p) => p.exercises ?? []);
   moduleExercise.clear();
   for (const ex of exercises) for (const id of withChallenges(ex.modules, quests.modules)) moduleExercise.set(quests.modules.get(id).source, ex.id);
