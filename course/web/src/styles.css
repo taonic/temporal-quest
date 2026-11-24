@@ -141,9 +141,26 @@ textarea {
 }
 
 .brand-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
   font-size: 15px;
   font-weight: 800;
   line-height: 1.2;
+}
+
+/* Beside the name: the course is in beta. */
+.beta-tag {
+  padding: 1px 6px;
+  border: 1px solid color-mix(in srgb, var(--temporal-uv) 55%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--temporal-uv) 14%, transparent);
+  color: var(--temporal-uv);
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1.4;
+  text-transform: uppercase;
 }
 
 .eyebrow,

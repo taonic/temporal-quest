@@ -291,7 +291,7 @@ watch(() => store.user, (user) => !user && closeFeedback());
         <img class="brand-image" src="/course-visual.png" alt="">
         <span class="brand-copy">
           <span class="eyebrow">Learn Temporal</span>
-          <span class="brand-title">Temporal Quest</span>
+          <span class="brand-title">Temporal Quest <span class="beta-tag" title="Temporal Quest is in beta: tell us what's rough with Feedback">Beta</span></span>
         </span>
       </a>
       <nav class="topbar-controls" aria-label="Course">
